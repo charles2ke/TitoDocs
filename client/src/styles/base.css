@@ -318,6 +318,21 @@ input[type='color'] {
   justify-content: space-between;
 }
 
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.checkbox-field input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
+
 .form-error {
   padding: 8px 12px;
   border-radius: var(--radius-sm);
@@ -359,17 +374,11 @@ input[type='color'] {
   outline: none;
 }
 
+/* Placed by MenuList relative to the parent item. */
 .menu.submenu {
-  position: absolute;
-  top: -7px;
-  left: calc(100% - 4px);
-  overflow: visible;
-  max-height: none;
-}
-
-.menu.submenu.menu-flip {
-  left: auto;
-  right: calc(100% - 4px);
+  position: fixed;
+  z-index: 60;
+  max-height: calc(100vh - 16px);
 }
 
 .menu-item {
@@ -505,6 +514,10 @@ input[type='color'] {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 18px;
+}
+
+.spacer {
+  flex: 1;
 }
 
 .dialog-message {

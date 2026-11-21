@@ -1,0 +1,785 @@
+/* Documents: page layout, the sheet of paper, the formatting toolbar, side panels and dialogs. */
+
+/* ------------------------------------------------------------------ layout */
+
+.doc-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg);
+}
+
+.doc-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.doc-main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.doc-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--canvas);
+}
+
+/* Wider than the window when the page is (zoomed) wider, so it can be scrolled sideways. */
+.doc-zoom {
+  width: max-content;
+  min-width: 100%;
+  padding: 20px 24px 96px;
+}
+
+.doc-zoom.pageless {
+  display: flex;
+  flex-direction: column;
+  width: auto;
+  min-height: 100%;
+  padding: 0;
+  background: #fff;
+}
+
+.comments-toggle {
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+
+.comments-badge {
+  position: absolute;
+  top: 3px;
+  right: 1px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.word-count-badge {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 5;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* Bubble menus are placed here, outside the zoomed page, so that their positions are not scaled. */
+.bubble-host {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 40;
+}
+
+/* ------------------------------------------------------------------ paper */
+
+/* The page stays white in the dark theme, like printed paper, so text colors look as they will in print. */
+.doc-paper {
+  --paper: #fff;
+  --surface: #fff;
+  --surface-2: #f1f4f9;
+  --surface-3: #e7ebf2;
+  --hover: rgba(60, 64, 67, 0.08);
+  --active: rgba(26, 115, 232, 0.12);
+  --border: #dadce0;
+  --border-strong: #bdc1c6;
+  --text: #202124;
+  --text-muted: #5f6368;
+  --accent: #1a73e8;
+  --accent-soft: #e8f0fe;
+  --accent-text: #0b57d0;
+  --link: #1155cc;
+  color-scheme: light;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  margin: 0 auto;
+  background: var(--paper);
+  color: var(--text);
+  box-shadow: 0 1px 3px 1px rgba(60, 64, 67, 0.15), 0 1px 2px rgba(60, 64, 67, 0.3);
+  cursor: text;
+}
+
+.doc-paper.pageless {
+  flex: 1;
+  width: 100%;
+  max-width: 1100px;
+  padding: 40px 64px 96px;
+  box-shadow: none;
+}
+
+.doc-editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.doc-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  padding-top: 96px;
+  background: var(--paper);
+}
+
+.doc-page.painting .doc-paper,
+.doc-page.painting .doc-paper .tiptap {
+  cursor:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg stroke='%23fff' stroke-width='4'%3E%3Crect x='3' y='3' width='14' height='5' rx='1.5'/%3E%3Cpath d='M17 5.5h2.5v5H11v4'/%3E%3Crect x='9.5' y='14.5' width='3' height='6.5' rx='1'/%3E%3C/g%3E%3Cg stroke='%23000' stroke-width='1.6'%3E%3Crect x='3' y='3' width='14' height='5' rx='1.5'/%3E%3Cpath d='M17 5.5h2.5v5H11v4'/%3E%3Crect x='9.5' y='14.5' width='3' height='6.5' rx='1'/%3E%3C/g%3E%3C/svg%3E")
+      11 21,
+    copy;
+}
+
+/* Typography matches the Word download: Arial 11 pt, 1.15 line spacing, 6 pt after paragraphs. */
+.doc-paper .tiptap {
+  flex: 1;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 11pt;
+  line-height: 1.3;
+}
+
+.doc-paper .tiptap p {
+  margin: 0 0 6pt;
+}
+
+.doc-paper .tiptap h1,
+.doc-paper .tiptap h2,
+.doc-paper .tiptap h3,
+.doc-paper .tiptap h4,
+.doc-paper .tiptap h5,
+.doc-paper .tiptap h6 {
+  margin: 12pt 0 4pt;
+  line-height: 1.15;
+  font-weight: 700;
+}
+
+.doc-paper .tiptap h1,
+.doc-paper .tiptap h2 {
+  margin-top: 18pt;
+}
+
+.doc-paper .tiptap h1 {
+  font-size: 20pt;
+}
+
+.doc-paper .tiptap h2 {
+  font-size: 16pt;
+}
+
+.doc-paper .tiptap h3 {
+  font-size: 14pt;
+}
+
+.doc-paper .tiptap h4 {
+  font-size: 12pt;
+}
+
+.doc-paper .tiptap h5,
+.doc-paper .tiptap h6 {
+  font-size: 11pt;
+}
+
+.doc-paper .tiptap h6 {
+  font-style: italic;
+  font-weight: 400;
+}
+
+.doc-paper .tiptap > :first-child {
+  margin-top: 0;
+}
+
+/* ------------------------------------------------------------------ toolbar */
+
+.doc-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  min-height: 40px;
+  margin: 0 12px 8px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--surface-2);
+  flex-shrink: 0;
+}
+
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 4px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tool-btn:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.tool-btn.active,
+.tool-btn[aria-expanded='true'] {
+  background: var(--active);
+  color: var(--accent-text);
+}
+
+.tool-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.tool-divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--border-strong);
+}
+
+.tool-dropdown {
+  padding: 0 2px 0 6px;
+}
+
+.tool-chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.tool-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.tool-style .tool-label {
+  width: 92px;
+}
+
+.tool-font .tool-label {
+  width: 104px;
+}
+
+.tool-zoom {
+  min-width: 64px;
+}
+
+.tool-mode {
+  gap: 6px;
+  padding: 0 6px 0 10px;
+}
+
+.tool-color {
+  flex-direction: column;
+  gap: 1px;
+  width: 30px;
+}
+
+.tool-color-letter {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 15px;
+}
+
+.tool-color-bar {
+  width: 18px;
+  height: 4px;
+  border-radius: 1px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+
+.font-size-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.font-size-input {
+  width: 40px !important;
+  height: 26px !important;
+  padding: 0 !important;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ outline */
+
+.outline-panel {
+  display: flex;
+  flex-direction: column;
+  width: 240px;
+  flex-shrink: 0;
+  padding: 12px 8px 12px 16px;
+  overflow-y: auto;
+  background: var(--canvas);
+}
+
+.outline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.outline-header h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.outline-panel ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.outline-panel li button {
+  display: block;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.outline-panel li button:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.outline-panel li button.current {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.outline-empty {
+  margin: 0;
+  padding: 0 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ------------------------------------------------------------------ comments */
+
+.comments-panel {
+  width: 340px;
+  background: var(--bg);
+}
+
+.comments-panel .side-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.comments-panel-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.comments-panel-tools select {
+  height: 28px;
+  padding: 0 6px;
+  font-size: 13px;
+}
+
+.comments-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 40px 16px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.comment-card {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  transition: box-shadow 0.12s;
+}
+
+.comment-card:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.comment-card-active {
+  border-color: transparent;
+  box-shadow: var(--shadow);
+  cursor: default;
+}
+
+.comment-card-active:hover {
+  box-shadow: var(--shadow);
+}
+
+.comment-card-new {
+  border-color: var(--accent);
+}
+
+.comment-card-resolved {
+  opacity: 0.75;
+}
+
+.comment-quote {
+  display: -webkit-box;
+  margin: 0 0 8px;
+  padding: 1px 0 1px 8px;
+  border-left: 3px solid #f0aa00;
+  color: var(--text-muted);
+  font-size: 13px;
+  overflow: hidden;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.comment-quote-deleted {
+  border-left-color: var(--border-strong);
+  text-decoration: line-through;
+}
+
+.comment-entry + .comment-entry {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.comment-entry-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.comment-entry-meta {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.comment-entry-meta strong {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comment-entry-meta time {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.comment-text {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.comment-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.comment-composer textarea {
+  width: 100%;
+  resize: none;
+}
+
+.comment-composer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.comment-resolved-note {
+  margin: 8px 0 0;
+  color: var(--success);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* ------------------------------------------------------------------ dialogs */
+
+.stats-table {
+  width: 100%;
+  margin-bottom: 14px;
+  border-collapse: collapse;
+}
+
+.stats-table th,
+.stats-table td {
+  padding: 7px 0;
+}
+
+.stats-table th {
+  font-weight: 400;
+  text-align: left;
+}
+
+.stats-table td {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-table tr + tr {
+  border-top: 1px solid var(--border);
+}
+
+.page-setup fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.page-setup legend {
+  margin-bottom: 6px;
+  padding: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.segmented {
+  display: flex;
+}
+
+.segmented label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.segmented label + label {
+  margin-left: -1px;
+}
+
+.segmented label:first-of-type {
+  border-radius: 16px 0 0 16px;
+}
+
+.segmented label:last-of-type {
+  border-radius: 0 16px 16px 0;
+}
+
+.segmented label:has(input:checked) {
+  z-index: 1;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 500;
+}
+
+.segmented label:has(input:focus-visible) {
+  z-index: 2;
+  box-shadow: var(--focus);
+}
+
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.margins {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.margins input {
+  width: 100%;
+}
+
+.shortcuts-search {
+  width: 100%;
+  margin-bottom: 14px;
+}
+
+.shortcuts-grid {
+  columns: 2 300px;
+  column-gap: 32px;
+}
+
+.shortcuts-grid section {
+  margin-bottom: 18px;
+  break-inside: avoid;
+}
+
+.shortcuts-grid h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.shortcuts-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.shortcuts-table td {
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.shortcuts-table td:last-child {
+  padding-left: 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.char-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+  gap: 4px;
+  max-height: 280px;
+  margin-top: 14px;
+  overflow-y: auto;
+}
+
+.char-btn {
+  height: 38px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.char-btn:hover {
+  border-color: var(--border-strong);
+  background: var(--hover);
+}
+
+/* ------------------------------------------------------------------ small screens */
+
+@media (max-width: 900px) {
+  .doc-body {
+    position: relative;
+  }
+
+  .outline-panel,
+  .comments-panel {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 15;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .outline-panel {
+    left: 0;
+    background: var(--surface);
+  }
+
+  .comments-panel {
+    right: 0;
+    max-width: calc(100% - 24px);
+  }
+
+  .doc-zoom:not(.pageless) {
+    padding: 12px 8px 64px;
+  }
+
+  .doc-paper.pageless {
+    padding: 24px 20px 64px;
+  }
+}
+
+/* ------------------------------------------------------------------ printing */
+
+/* Only the page content is printed; @page (see printCss) sets the paper size and margins. */
+@media print {
+  html,
+  body,
+  #root {
+    height: auto !important;
+    background: #fff !important;
+  }
+
+  .toasts,
+  .doc-page > :not(.doc-body),
+  .doc-main > :not(.doc-scroll),
+  .doc-loading {
+    display: none !important;
+  }
+
+  .doc-page,
+  .doc-body,
+  .doc-main,
+  .doc-scroll,
+  .doc-zoom {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: none !important;
+  }
+
+  .doc-zoom {
+    zoom: 1 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+  }
+
+  .doc-paper {
+    width: auto !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .doc-paper .tiptap .is-empty::before {
+    content: none !important;
+  }
+}

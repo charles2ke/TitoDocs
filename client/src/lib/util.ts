@@ -113,6 +113,38 @@ export function downloadBlob(blob: Blob, filename: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/**
+ * Fetches a same-origin resource such as an uploaded image (which requires the session cookie).
+ * Other origins resolve to null: the content security policy only allows connections to this server.
+ */
+export async function fetchSameOrigin(src: string): Promise<Blob | null> {
+  let url: URL;
+  try {
+    url = new URL(src, window.location.href);
+  } catch {
+    return null;
+  }
+  if (url.origin !== window.location.origin) return null;
+  try {
+    const response = await fetch(url, { credentials: 'same-origin' });
+    return response.ok ? await response.blob() : null;
+  } catch {
+    return null;
+  }
+}
+
+export const blobToDataUrl = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+
+const HTML_ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+
+export const escapeHtml = (text: string): string => text.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char]!);
+
 /** Makes a string safe to use as a file name. */
 export const safeFileName = (title: string, fallback = 'untitled'): string =>
   title.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').trim().slice(0, 120) || fallback;
@@ -135,5 +167,7 @@ export const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(
 export const shortcut = (keys: string): string =>
   keys
     .split('-')
-    .map((key) => (key === 'Mod' ? (isMac ? '⌘' : 'Ctrl') : key === 'Alt' && isMac ? '⌥' : key === 'Shift' && isMac ? '⇧' : key))
+    .map((key) =>
+      key === 'Mod' ? (isMac ? '⌘' : 'Ctrl') : key === 'Alt' && isMac ? '⌥' : key === 'Shift' && isMac ? '⇧' : key.length === 1 ? key.toUpperCase() : key,
+    )
     .join(isMac ? '' : '+');

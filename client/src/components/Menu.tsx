@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { Check, ChevronRight } from 'lucide-react';
 import { useDismiss } from '../lib/util';
 
@@ -15,6 +15,8 @@ export type MenuEntry =
       submenu?: MenuEntry[];
       /** Test id for end-to-end tests. */
       testId?: string;
+      /** Style for the label, e.g. to preview a font. */
+      style?: CSSProperties;
     }
   | { type: 'separator' }
   | { type: 'label'; label: string }
@@ -30,23 +32,34 @@ interface MenuListProps {
   autoFocus?: boolean;
   className?: string;
   label?: string;
+  /** Opens beside the parent item; fixed positioning keeps the parent menu's scrolling from clipping it. */
+  submenu?: boolean;
 }
 
-export function MenuList({ items, onClose, onBack, autoFocus = true, className = '', label }: MenuListProps) {
+export function MenuList({ items, onClose, onBack, autoFocus = true, className = '', label, submenu = false }: MenuListProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [openSub, setOpenSub] = useState<number | null>(null);
-  const [flip, setFlip] = useState(false);
+  const [position, setPosition] = useState<CSSProperties>();
 
   useLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
     const rect = element.getBoundingClientRect();
-    if (rect.right > window.innerWidth - 8) setFlip(true);
-  }, []);
+    if (!submenu) {
+      const overflow = rect.right - (window.innerWidth - 8);
+      if (overflow > 0) setPosition({ marginLeft: -Math.min(overflow, rect.left - 8) });
+      return;
+    }
+    const item = element.parentElement!.getBoundingClientRect();
+    let left = item.right - 4;
+    if (left + rect.width > window.innerWidth - 8) left = Math.max(8, item.left - rect.width + 4);
+    const top = Math.max(8, Math.min(item.top - 7, window.innerHeight - 8 - rect.height));
+    setPosition({ left, top });
+  }, [submenu]);
 
   useEffect(() => {
     if (!autoFocus) return;
-    ref.current?.querySelector<HTMLElement>('[role^="menuitem"]:not([aria-disabled="true"])')?.focus();
+    ref.current?.querySelector<HTMLElement>('[role^="menuitem"]:not([aria-disabled="true"])')?.focus({ preventScroll: true });
   }, [autoFocus]);
 
   const focusables = () =>
@@ -81,8 +94,11 @@ export function MenuList({ items, onClose, onBack, autoFocus = true, className =
       ref={ref}
       role="menu"
       aria-label={label}
-      className={`menu ${flip ? 'menu-flip' : ''} ${className}`}
+      className={`menu ${submenu ? 'submenu' : ''} ${className}`}
+      style={position}
       onKeyDown={onKeyDown}
+      // A fixed submenu would drift away from its item, so close it instead.
+      onScroll={(event) => event.target === event.currentTarget && setOpenSub(null)}
       tabIndex={-1}
     >
       {items.map((entry, index) => {
@@ -132,7 +148,9 @@ export function MenuList({ items, onClose, onBack, autoFocus = true, className =
           >
             <span className="menu-check">{entry.checked && <Check size={14} />}</span>
             {entry.icon && <span className="menu-icon">{entry.icon}</span>}
-            <span className="menu-text">{entry.label}</span>
+            <span className="menu-text" style={entry.style}>
+              {entry.label}
+            </span>
             {entry.shortcut && <span className="menu-shortcut">{entry.shortcut}</span>}
             {hasSub && <ChevronRight size={14} className="menu-chevron" />}
             {hasSub && openSub === index && (
@@ -143,7 +161,7 @@ export function MenuList({ items, onClose, onBack, autoFocus = true, className =
                   setOpenSub(null);
                   (ref.current?.children[index] as HTMLElement | undefined)?.focus();
                 }}
-                className="submenu"
+                submenu
                 autoFocus
                 label={entry.label}
               />

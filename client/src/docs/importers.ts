@@ -1,6 +1,7 @@
 import DOMPurify from 'dompurify';
 import { api } from '../api';
 import { MAX_TEXT_FILE_BYTES, extensionOf } from '../lib/files';
+import { escapeHtml } from '../lib/util';
 
 /** Removes scripts, event handlers and other active content from imported HTML. */
 export const sanitizeHtml = (html: string): string =>
@@ -11,9 +12,6 @@ export const sanitizeHtml = (html: string): string =>
 
 /** Parses HTML without running scripts or loading images, which `element.innerHTML` would do. */
 const parseInert = (html: string): HTMLElement => new DOMParser().parseFromString(html, 'text/html').body;
-
-const escapeHtml = (text: string): string =>
-  text.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
 
 export const textToHtml = (text: string): string =>
   text

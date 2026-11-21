@@ -62,12 +62,17 @@ interface PromptProps {
 export function PromptDialog({ title, label, initial = '', confirmLabel = 'OK', placeholder, onSubmit, onClose, multiline }: PromptProps) {
   const [value, setValue] = useState(initial);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setBusy(true);
+    setError('');
     try {
       await onSubmit(value);
       onClose();
+    } catch (caught) {
+      // Validation errors thrown by onSubmit keep the dialog open.
+      setError(caught instanceof Error ? caught.message : 'Something went wrong.');
     } finally {
       setBusy(false);
     }
@@ -84,11 +89,19 @@ export function PromptDialog({ title, label, initial = '', confirmLabel = 'OK', 
               autoFocus
               value={value}
               placeholder={placeholder}
-              onChange={(event) => setValue(event.target.value)}
+              onChange={(event) => {
+                setValue(event.target.value);
+                setError('');
+              }}
               onFocus={(event) => event.target.select()}
             />
           )}
         </label>
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
         <div className="dialog-actions">
           <button type="button" className="btn" onClick={onClose}>
             Cancel
