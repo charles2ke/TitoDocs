@@ -25,6 +25,7 @@ import { Comments, type ThreadsMap } from './comments';
 import { FindReplace } from './find-replace';
 import { PageBreak } from './page-break';
 import { ParagraphFormat } from './paragraph-format';
+import { ReadOnlySelection } from './read-only-selection';
 import { SlashCommands, UserMention, type SlashItem } from './suggestions';
 import { TableOfContents } from './table-of-contents';
 
@@ -70,7 +71,7 @@ export async function pickImage(editor: Editor, onError: (error: unknown) => voi
   await insertImages(editor, [image], null, onError);
 }
 
-/** Extensions that define the content schema and formatting, without collaboration or editing UI. */
+/** Extensions that define the content schema and formatting (and read-only selection), without collaboration or editing UI. */
 export function contentExtensions(extra: AnyExtension[] = []): AnyExtension[] {
   return [
     StarterKit.configure({
@@ -107,6 +108,7 @@ export function contentExtensions(extra: AnyExtension[] = []): AnyExtension[] {
     PageBreak,
     TableOfContents,
     UserMention,
+    ReadOnlySelection,
     ...extra,
   ];
 }
