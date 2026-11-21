@@ -33,5 +33,7 @@ export default defineConfig({
     env: { E2E_PORT: String(port) },
     reuseExistingServer: false,
     timeout: 180_000,
+    // Without it the server is killed outright and cannot delete its data directory.
+    gracefulShutdown: { signal: 'SIGTERM', timeout: 5_000 },
   },
 });
