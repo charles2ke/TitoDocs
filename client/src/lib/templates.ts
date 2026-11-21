@@ -117,6 +117,16 @@ export const DOC_TEMPLATES: (() => DocTemplate)[] = [
   }),
 ];
 
+/** The first page of a new workspace. */
+export const WELCOME_PAGE_HTML = `<p>This workspace is a place to plan and work together. Everyone with access sees changes as they happen.</p>
+<h2>Get started</h2>
+<ul>
+<li><p>Type <code>/</code> on a new line to add a Loop component: a task list, voting table, progress tracker, Q&amp;A or a block of rich text.</p></li>
+<li><p>Copy a component's link and paste it on another page. Both copies stay in sync.</p></li>
+<li><p>Add pages and subpages from the sidebar. Drag them to reorder or nest them.</p></li>
+<li><p>Select text to format it or add a comment.</p></li>
+</ul>`;
+
 export interface CodeTemplate {
   id: string;
   name: string;

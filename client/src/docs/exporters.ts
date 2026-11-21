@@ -314,8 +314,11 @@ export function exportText(doc: PMNode): string {
         });
         return rows;
       }
-      default:
-        return children(node);
+      default: {
+        // Block atoms such as Loop components export the text their extension's renderText gives.
+        const toText = node.type.spec.toText as ((props: { node: PMNode }) => string) | undefined;
+        return node.isAtom && toText ? [toText({ node })] : children(node);
+      }
     }
   };
 

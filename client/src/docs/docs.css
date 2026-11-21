@@ -46,29 +46,6 @@
   background: #fff;
 }
 
-.comments-toggle {
-  position: relative;
-  width: 40px;
-  height: 40px;
-}
-
-.comments-badge {
-  position: absolute;
-  top: 3px;
-  right: 1px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 8px;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 16px;
-  text-align: center;
-  pointer-events: none;
-}
-
 .word-count-badge {
   position: absolute;
   left: 16px;
@@ -82,14 +59,6 @@
   box-shadow: var(--shadow-sm);
   font-size: 13px;
   cursor: pointer;
-}
-
-/* Bubble menus are placed here, outside the zoomed page, so that their positions are not scaled. */
-.bubble-host {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 40;
 }
 
 /* ------------------------------------------------------------------ paper */
@@ -325,153 +294,6 @@
   font-size: 13px;
 }
 
-/* ------------------------------------------------------------------ comments */
-
-.comments-panel {
-  width: 340px;
-  background: var(--bg);
-}
-
-.comments-panel .side-panel-body {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.comments-panel-tools {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.comments-panel-tools select {
-  height: 28px;
-  padding: 0 6px;
-  font-size: 13px;
-}
-
-.comments-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 40px 16px;
-  color: var(--text-muted);
-  text-align: center;
-}
-
-.comment-card {
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  cursor: pointer;
-  transition: box-shadow 0.12s;
-}
-
-.comment-card:hover {
-  box-shadow: var(--shadow-sm);
-}
-
-.comment-card-active {
-  border-color: transparent;
-  box-shadow: var(--shadow);
-  cursor: default;
-}
-
-.comment-card-active:hover {
-  box-shadow: var(--shadow);
-}
-
-.comment-card-new {
-  border-color: var(--accent);
-}
-
-.comment-card-resolved {
-  opacity: 0.75;
-}
-
-.comment-quote {
-  display: -webkit-box;
-  margin: 0 0 8px;
-  padding: 1px 0 1px 8px;
-  border-left: 3px solid #f0aa00;
-  color: var(--text-muted);
-  font-size: 13px;
-  overflow: hidden;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-}
-
-.comment-quote-deleted {
-  border-left-color: var(--border-strong);
-  text-decoration: line-through;
-}
-
-.comment-entry + .comment-entry {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
-}
-
-.comment-entry-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.comment-entry-meta {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-  line-height: 1.3;
-}
-
-.comment-entry-meta strong {
-  font-size: 13px;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.comment-entry-meta time {
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.comment-text {
-  margin: 6px 0 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.comment-composer {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.comment-composer textarea {
-  width: 100%;
-  resize: none;
-}
-
-.comment-composer-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.comment-resolved-note {
-  margin: 8px 0 0;
-  color: var(--success);
-  font-size: 12px;
-  font-weight: 500;
-}
-
 /* ------------------------------------------------------------------ dialogs */
 
 .page-setup fieldset {
@@ -529,23 +351,14 @@
     position: relative;
   }
 
-  .outline-panel,
-  .comments-panel {
+  .outline-panel {
     position: absolute;
     top: 0;
     bottom: 0;
-    z-index: 15;
-    box-shadow: var(--shadow-lg);
-  }
-
-  .outline-panel {
     left: 0;
+    z-index: 15;
     background: var(--surface);
-  }
-
-  .comments-panel {
-    right: 0;
-    max-width: calc(100% - 24px);
+    box-shadow: var(--shadow-lg);
   }
 
   .doc-zoom:not(.pageless) {

@@ -1,7 +1,9 @@
-import type { Content, Editor } from '@tiptap/core';
+import type { Content, Editor, JSONContent } from '@tiptap/core';
 import type { Mark } from '@tiptap/pm/model';
 import { TextSelection } from '@tiptap/pm/state';
-import { yUndoPluginKey } from '@tiptap/y-tiptap';
+import { yDocToProsemirrorJSON, yUndoPluginKey } from '@tiptap/y-tiptap';
+import type * as Y from 'yjs';
+import { RICH_FIELD } from '@shared/types';
 
 export const FONT_FAMILIES = [
   'Arial',
@@ -177,4 +179,10 @@ export function clipboardCommand(editor: Editor, command: 'cut' | 'copy'): boole
 export function applyInitialContent(editor: Editor, content: Content): void {
   editor.chain().setMeta('addToHistory', false).setContent(content).run();
   yUndoPluginKey.getState(editor.state)?.undoManager.clear();
+}
+
+/** The rich-text content of a Yjs document (such as a saved version), or null when it is empty. */
+export function richContent(doc: Y.Doc): JSONContent | null {
+  const json = yDocToProsemirrorJSON(doc, RICH_FIELD) as JSONContent;
+  return json.content?.length ? json : null;
 }

@@ -20,6 +20,7 @@ import { common, createLowlight } from 'lowlight';
 import { RICH_FIELD } from '@shared/types';
 import { api } from '../api';
 import type { AwarenessUser, Room } from '../collab';
+import { pickFile } from '../lib/util';
 import { Comments, type ThreadsMap } from './comments';
 import { FindReplace } from './find-replace';
 import { PageBreak } from './page-break';
@@ -56,6 +57,17 @@ export async function insertImages(editor: Editor, files: File[], pos: number | 
       onError?.(error);
     }
   }
+}
+
+/** Opens the file picker and inserts the chosen image at the cursor. */
+export async function pickImage(editor: Editor, onError: (error: unknown) => void): Promise<void> {
+  const image = await pickFile(IMAGE_TYPES.join(','));
+  if (!image) return;
+  if (!IMAGE_TYPES.includes(image.type)) {
+    onError(new Error('Choose a PNG, JPEG, GIF or WebP image.'));
+    return;
+  }
+  await insertImages(editor, [image], null, onError);
 }
 
 /** Extensions that define the content schema and formatting, without collaboration or editing UI. */

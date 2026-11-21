@@ -1,4 +1,4 @@
-import { createContext, use, useCallback, useMemo, useState, type ReactNode } from 'react';
+import { createContext, use, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 
 type ToastKind = 'info' | 'success' | 'error';
@@ -7,6 +7,7 @@ interface Toast {
   id: number;
   message: string;
   kind: ToastKind;
+  duration: number;
   action?: { label: string; onClick(): void };
 }
 
@@ -23,14 +24,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const dismiss = useCallback((id: number) => setToasts((list) => list.filter((toast) => toast.id !== id)), []);
 
-  const show = useCallback<ToastApi['show']>(
-    (message, { kind = 'info', action, duration = 4000 } = {}) => {
-      const id = nextId++;
-      setToasts((list) => [...list.slice(-3), { id, message, kind, action }]);
-      setTimeout(() => dismiss(id), duration);
-    },
-    [dismiss],
-  );
+  const show = useCallback<ToastApi['show']>((message, { kind = 'info', action, duration = action ? 8000 : 4000 } = {}) => {
+    const id = nextId++;
+    setToasts((list) => [...list.slice(-3), { id, message, kind, duration, action }]);
+  }, []);
 
   const api = useMemo<ToastApi>(
     () => ({
@@ -45,26 +42,54 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div className="toasts" role="status" aria-live="polite">
         {toasts.map((toast) => (
-          <div key={toast.id} className={`toast toast-${toast.kind}`}>
-            <span>{toast.message}</span>
-            {toast.action && (
-              <button
-                className="btn btn-link"
-                onClick={() => {
-                  toast.action!.onClick();
-                  dismiss(toast.id);
-                }}
-              >
-                {toast.action.label}
-              </button>
-            )}
-            <button className="icon-btn icon-btn-sm" aria-label="Dismiss" onClick={() => dismiss(toast.id)}>
-              <X size={14} />
-            </button>
-          </div>
+          <ToastItem key={toast.id} toast={toast} onDismiss={dismiss} />
         ))}
       </div>
     </ToastContext>
+  );
+}
+
+/** Counts down only while the pointer and focus are elsewhere, so there is time to read the toast and reach its action. */
+function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss(id: number): void }) {
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const remaining = useRef(toast.duration);
+  const expire = useEffectEvent(() => onDismiss(toast.id));
+
+  useEffect(() => {
+    if (hovered || focused) return;
+    const start = Date.now();
+    const timer = setTimeout(() => expire(), remaining.current);
+    return () => {
+      clearTimeout(timer);
+      remaining.current -= Date.now() - start;
+    };
+  }, [hovered, focused]);
+
+  return (
+    <div
+      className={`toast toast-${toast.kind}`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={(event) => !event.currentTarget.contains(event.relatedTarget) && setFocused(false)}
+    >
+      <span>{toast.message}</span>
+      {toast.action && (
+        <button
+          className="btn btn-link"
+          onClick={() => {
+            toast.action!.onClick();
+            onDismiss(toast.id);
+          }}
+        >
+          {toast.action.label}
+        </button>
+      )}
+      <button className="icon-btn icon-btn-sm" aria-label="Dismiss" onClick={() => onDismiss(toast.id)}>
+        <X size={14} />
+      </button>
+    </div>
   );
 }
 

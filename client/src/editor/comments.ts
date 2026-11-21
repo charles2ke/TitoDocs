@@ -4,6 +4,7 @@ import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/p
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { absolutePositionToRelativePosition, relativePositionToAbsolutePosition, ySyncPluginKey } from '@tiptap/y-tiptap';
 import * as Y from 'yjs';
+import { randomId } from '../lib/util';
 
 export interface CommentAuthor {
   id: string;
@@ -30,7 +31,7 @@ export interface CommentThread extends CommentReply {
 /** threads: Y.Map<threadId, Y.Map<field, value>>; replies are a Y.Array of plain objects. */
 export type ThreadsMap = Y.Map<Y.Map<unknown>>;
 
-const newId = (): string => crypto.randomUUID();
+const newId = randomId;
 
 /** A range tied to the shared document, so it follows the text through everyone's edits. */
 export interface AnchoredRange {

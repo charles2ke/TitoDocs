@@ -161,10 +161,11 @@ interface TitleInputProps {
   editable: boolean;
   onRename: (title: string) => Promise<void> | void;
   className?: string;
+  label?: string;
 }
 
 /** A document title that renames the file when edited (like Google Docs). */
-export function TitleInput({ title, editable, onRename, className = '' }: TitleInputProps) {
+export function TitleInput({ title, editable, onRename, className = '', label = 'File name' }: TitleInputProps) {
   const [value, setValue] = useState(title);
   useEffect(() => setValue(title), [title]);
   const commit = () => {
@@ -175,7 +176,7 @@ export function TitleInput({ title, editable, onRename, className = '' }: TitleI
   return (
     <input
       className={`title-input ${className}`}
-      aria-label="File name"
+      aria-label={label}
       value={value}
       readOnly={!editable}
       size={Math.max(8, Math.min(value.length + 1, 48))}
@@ -222,9 +223,11 @@ interface AppHeaderProps {
   menubar?: ReactNode;
   actions?: ReactNode;
   icon: ReactNode;
+  /** Offer the star button (Loop components never appear in the starred list). */
+  star?: boolean;
 }
 
-export function AppHeader({ file, workspace, status, people, onFileChange, menubar, actions, icon }: AppHeaderProps) {
+export function AppHeader({ file, workspace, status, people, onFileChange, menubar, actions, icon, star = true }: AppHeaderProps) {
   const toast = useToast();
   const [sharing, setSharing] = useState(false);
   const rename = async (title: string) => {
@@ -244,7 +247,7 @@ export function AppHeader({ file, workspace, status, people, onFileChange, menub
         <div className="header-title-row">
           <span className="header-type-icon">{icon}</span>
           <TitleInput title={file.title} editable={canEdit(file.role) && !file.trashedAt} onRename={rename} />
-          <StarButton file={file} onChange={(starred) => onFileChange((current) => ({ ...current, starred }))} />
+          {star && <StarButton file={file} onChange={(starred) => onFileChange((current) => ({ ...current, starred }))} />}
           <SaveStatus status={status} readOnly={!canEdit(file.role)} />
         </div>
         {menubar}

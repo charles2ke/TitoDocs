@@ -18,6 +18,9 @@ export function fileUrl(file: Pick<FileMeta, 'id' | 'type' | 'workspaceId'>): st
 
 export const absoluteUrl = (path: string): string => new URL(path, window.location.origin).toString();
 
+/** A random id. Unlike `crypto.randomUUID()`, this also works on plain-HTTP deployments (non-secure contexts). */
+export const randomId = (): string => Array.from(crypto.getRandomValues(new Uint8Array(12)), (byte) => byte.toString(16).padStart(2, '0')).join('');
+
 export const TYPE_LABELS: Record<FileType, string> = {
   doc: 'Document',
   code: 'Code file',

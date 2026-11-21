@@ -32,7 +32,7 @@ import { useToast } from '../components/Toast';
 import { EmptyState, FileTypeIcon, Logo, Spinner } from '../components/ui';
 import { UserMenu } from '../components/AppHeader';
 import { DOC_IMPORT_ACCEPT, DOC_IMPORT_EXTENSIONS, extensionOf, readTextFile, stripExtension } from '../lib/files';
-import { CODE_TEMPLATES, DOC_TEMPLATES, setInitialContent, type InitialContent } from '../lib/templates';
+import { CODE_TEMPLATES, DOC_TEMPLATES, setInitialContent, WELCOME_PAGE_HTML, type InitialContent } from '../lib/templates';
 import { TYPE_LABELS, fileUrl, formatTime, pickFile, useDebounced } from '../lib/util';
 
 const VIEWS: { id: FileView; label: string; icon: ReactNode }[] = [
@@ -89,6 +89,7 @@ export function Home() {
       if (initial) setInitialContent(file.id, initial);
       if (file.type === 'workspace') {
         const { file: page } = await api.createFile({ type: 'page', workspaceId: file.id, title: 'Welcome', icon: '👋' });
+        setInitialContent(page.id, { kind: 'html', html: WELCOME_PAGE_HTML });
         navigate(fileUrl(page));
       } else {
         navigate(fileUrl(file));

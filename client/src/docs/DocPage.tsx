@@ -4,7 +4,6 @@ import { EditorContent, useEditor } from '@tiptap/react';
 import type { Editor, JSONContent } from '@tiptap/core';
 import type { Mark } from '@tiptap/pm/model';
 import { Selection } from '@tiptap/pm/state';
-import { yDocToProsemirrorJSON } from '@tiptap/y-tiptap';
 import type * as Y from 'yjs';
 import { Ban, Eye, MessageSquare, MessageSquareText } from 'lucide-react';
 import { canComment, canEdit, commentsDocName, META_FIELD, RICH_FIELD, THREADS_FIELD, type FileMeta } from '@shared/types';
@@ -19,9 +18,9 @@ import { useToast } from '../components/Toast';
 import { FileTypeIcon, FullPageSpinner, Spinner } from '../components/ui';
 import { VersionHistory } from '../components/VersionHistory';
 import { anchorRange, getPendingComment, type CommentAuthor, type ThreadsMap } from '../editor/comments';
-import { applyInitialContent, applyMarks, captureMarks, clearFormatting } from '../editor/commands';
+import { applyInitialContent, applyMarks, captureMarks, clearFormatting, richContent } from '../editor/commands';
 import { LinkBubble, TableBubble, TextBubble } from '../editor/EditorBubbles';
-import { buildExtensions, contentExtensions, IMAGE_TYPES, insertImages } from '../editor/extensions';
+import { buildExtensions, contentExtensions, pickImage } from '../editor/extensions';
 import { FindReplaceBar } from '../editor/FindReplaceBar';
 import { LinkDialog, selectLink } from '../editor/LinkDialog';
 import { basicSlashItems } from '../editor/slashItems';
@@ -47,12 +46,6 @@ const textToDoc = (text: string): JSONContent => ({
   content: text.split(/\r?\n/).map((line) => (line ? { type: 'paragraph', content: [{ type: 'text', text: line }] } : { type: 'paragraph' })),
 });
 
-/** The rich-text content of a Yjs document, or null when it is empty. */
-function richContent(doc: Y.Doc): JSONContent | null {
-  const json = yDocToProsemirrorJSON(doc, RICH_FIELD) as JSONContent;
-  return json.content?.length ? json : null;
-}
-
 /** Paper size and margins as CSS (pageless documents are styled by the `.pageless` class instead). */
 function paperStyle(setup: PageSetup): CSSProperties | undefined {
   if (setup.pageless) return undefined;
@@ -70,16 +63,6 @@ const isImageUrl = (src: string): boolean => {
     return false;
   }
 };
-
-async function pickImage(editor: Editor, onError: (error: unknown) => void): Promise<void> {
-  const image = await pickFile(IMAGE_TYPES.join(','));
-  if (!image) return;
-  if (!IMAGE_TYPES.includes(image.type)) {
-    onError(new Error('Choose a PNG, JPEG, GIF or WebP image.'));
-    return;
-  }
-  await insertImages(editor, [image], null, onError);
-}
 
 /** The word around the cursor (the format painter formats the clicked word when nothing is selected). */
 function wordAt(editor: Editor): { from: number; to: number } | null {
