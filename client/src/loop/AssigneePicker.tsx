@@ -18,7 +18,10 @@ export function AssigneePicker({ value, editable, onChange }: AssigneePickerProp
   const me = useUser();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [users, setUsers] = useState<PublicUser[] | null>(null);
+  // Results keep the search they were found for, so Enter never picks someone found for older text.
+  const [results, setResults] = useState<{ search: string; users: PublicUser[] } | null>(null);
+  // Text for which Enter was pressed before its results came in.
+  const [enterFor, setEnterFor] = useState<string | null>(null);
   const search = useDebounced(query.trim(), 200);
   const ref = useDismiss<HTMLDivElement>(open, () => close(false));
 
@@ -26,17 +29,28 @@ export function AssigneePicker({ value, editable, onChange }: AssigneePickerProp
     if (!open) return;
     let cancelled = false;
     api.searchUsers(search).then(
-      (result) => !cancelled && setUsers(result.users),
-      () => !cancelled && setUsers([]),
+      (result) => !cancelled && setResults({ search, users: result.users }),
+      () => !cancelled && setResults({ search, users: [] }),
     );
     return () => {
       cancelled = true;
     };
   }, [open, search]);
 
+  // The first person found for the typed text: undefined until those results are in, null if there is no one.
+  const typed = query.trim();
+  const topMatch = typed && results?.search === typed ? (results.users[0] ?? null) : undefined;
+
+  useEffect(() => {
+    if (enterFor === null || enterFor !== typed || topMatch === undefined) return;
+    setEnterFor(null);
+    if (topMatch) choose(toPerson(topMatch));
+  }, [enterFor, typed, topMatch]);
+
   function close(refocus: boolean) {
     setOpen(false);
     setQuery('');
+    setEnterFor(null);
     if (refocus) ref.current?.querySelector<HTMLElement>('.assignee-btn')?.focus();
   }
 
@@ -74,7 +88,8 @@ export function AssigneePicker({ value, editable, onChange }: AssigneePickerProp
       targets[Math.max(0, Math.min(targets.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)))]?.focus();
     } else if (event.key === 'Enter' && event.target instanceof HTMLInputElement) {
       event.preventDefault();
-      ref.current?.querySelector<HTMLElement>('.assignee-option[data-match]')?.click();
+      if (topMatch) choose(toPerson(topMatch));
+      else if (topMatch === undefined && typed) setEnterFor(typed);
     } else if (event.key === 'Escape') {
       event.stopPropagation();
       close(true);
@@ -82,7 +97,7 @@ export function AssigneePicker({ value, editable, onChange }: AssigneePickerProp
   };
 
   // Without a search, the current user is offered separately as "Assign to me".
-  const people = (users ?? []).filter((user) => search || user.id !== me.id);
+  const people = (results?.users ?? []).filter((user) => search || user.id !== me.id);
   return (
     <div className="assignee-picker" ref={ref}>
       <button
@@ -104,7 +119,10 @@ export function AssigneePicker({ value, editable, onChange }: AssigneePickerProp
             aria-label="Search people"
             value={query}
             autoFocus
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setEnterFor(null);
+            }}
           />
           <div className="assignee-options">
             {!search && (
@@ -112,12 +130,11 @@ export function AssigneePicker({ value, editable, onChange }: AssigneePickerProp
                 <Avatar user={toPerson(me)} size={22} /> Assign to me
               </button>
             )}
-            {people.map((user, index) => (
+            {people.map((user) => (
               <button
                 key={user.id}
                 type="button"
                 className="assignee-option"
-                data-match={index === 0 ? '' : undefined}
                 onClick={() => choose(toPerson(user))}
               >
                 <Avatar user={toPerson(user)} size={22} />
@@ -125,7 +142,7 @@ export function AssigneePicker({ value, editable, onChange }: AssigneePickerProp
                 <span className="muted">@{user.username}</span>
               </button>
             ))}
-            {users && !people.length && search && <p className="assignee-empty muted">No one found</p>}
+            {results && !people.length && search && <p className="assignee-empty muted">No one found</p>}
             {value && (
               <button type="button" className="assignee-option" onClick={() => choose(null)}>
                 <UserMinus size={16} aria-hidden /> Unassign
