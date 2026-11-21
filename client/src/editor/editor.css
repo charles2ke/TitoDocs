@@ -1,0 +1,1101 @@
+/* Rich-text content shared by documents and Loop pages. Scoped to TipTap's `.tiptap` editor element. */
+
+.tiptap {
+  outline: none;
+  color: var(--text);
+  caret-color: var(--text);
+  line-height: 1.5;
+  overflow-wrap: break-word;
+}
+
+/* Chromium always matches :focus-visible on contenteditable; the caret already shows focus. */
+.tiptap:focus-visible {
+  box-shadow: none;
+}
+
+.tiptap p {
+  margin: 0 0 0.6em;
+}
+
+.tiptap h1,
+.tiptap h2,
+.tiptap h3,
+.tiptap h4,
+.tiptap h5,
+.tiptap h6 {
+  line-height: 1.25;
+  font-weight: 600;
+  margin: 1.1em 0 0.4em;
+}
+
+.tiptap h1 {
+  font-size: 1.9em;
+}
+
+.tiptap h2 {
+  font-size: 1.5em;
+}
+
+.tiptap h3 {
+  font-size: 1.25em;
+}
+
+.tiptap h4 {
+  font-size: 1.1em;
+}
+
+.tiptap h5 {
+  font-size: 1em;
+}
+
+.tiptap h6 {
+  font-size: 1em;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.tiptap > :first-child {
+  margin-top: 0;
+}
+
+.tiptap a {
+  color: var(--link, #1155cc);
+  text-decoration: underline;
+  cursor: text;
+}
+
+.tiptap.ProseMirror:not([contenteditable='true']) a {
+  cursor: pointer;
+}
+
+.tiptap mark {
+  border-radius: 2px;
+  padding: 0 1px;
+  color: inherit;
+}
+
+/* ------------------------------------------------------------------ lists */
+
+.tiptap ul,
+.tiptap ol {
+  margin: 0 0 0.6em;
+  padding-left: 1.6em;
+}
+
+.tiptap li > p {
+  margin: 0 0 0.15em;
+}
+
+.tiptap li > ul,
+.tiptap li > ol {
+  margin-bottom: 0;
+}
+
+.tiptap ul ul {
+  list-style-type: circle;
+}
+
+.tiptap ul ul ul {
+  list-style-type: square;
+}
+
+.tiptap ol ol {
+  list-style-type: lower-alpha;
+}
+
+.tiptap ol ol ol {
+  list-style-type: lower-roman;
+}
+
+.tiptap ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0.2em;
+}
+
+.tiptap ul[data-type='taskList'] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+}
+
+.tiptap ul[data-type='taskList'] li > label {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 1.5em;
+  user-select: none;
+}
+
+.tiptap ul[data-type='taskList'] li > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.tiptap ul[data-type='taskList'] input[type='checkbox'] {
+  width: 1.05em;
+  height: 1.05em;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.tiptap ul[data-type='taskList'] li[data-checked='true'] > div {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.tiptap ul[data-type='taskList'] ul[data-type='taskList'] {
+  margin: 0;
+}
+
+/* ------------------------------------------------------------------ blocks */
+
+.tiptap blockquote {
+  margin: 0 0 0.6em;
+  padding: 0.1em 0 0.1em 1em;
+  border-left: 3px solid var(--border-strong);
+  color: var(--text-muted);
+}
+
+.tiptap hr {
+  border: none;
+  border-top: 1px solid var(--border-strong);
+  margin: 1.2em 0;
+  padding: 2px 0;
+  background-clip: content-box;
+  cursor: pointer;
+}
+
+.tiptap code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--surface-3);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+}
+
+.tiptap pre {
+  margin: 0 0 0.8em;
+  padding: 0.8em 1em;
+  border-radius: 8px;
+  background: #1f2329;
+  color: #e6e6e6;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  tab-size: 2;
+}
+
+.tiptap pre code {
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  padding: 0;
+}
+
+/* Syntax colours (One Dark), used by lowlight inside code blocks. */
+.tiptap .hljs-comment,
+.tiptap .hljs-quote {
+  color: #7f848e;
+  font-style: italic;
+}
+
+.tiptap .hljs-keyword,
+.tiptap .hljs-selector-tag,
+.tiptap .hljs-doctag,
+.tiptap .hljs-formula {
+  color: #c678dd;
+}
+
+.tiptap .hljs-section,
+.tiptap .hljs-name,
+.tiptap .hljs-deletion,
+.tiptap .hljs-subst,
+.tiptap .hljs-tag {
+  color: #e06c75;
+}
+
+.tiptap .hljs-literal,
+.tiptap .hljs-operator {
+  color: #56b6c2;
+}
+
+.tiptap .hljs-string,
+.tiptap .hljs-regexp,
+.tiptap .hljs-addition,
+.tiptap .hljs-meta .hljs-string {
+  color: #98c379;
+}
+
+.tiptap .hljs-attr,
+.tiptap .hljs-attribute,
+.tiptap .hljs-variable,
+.tiptap .hljs-template-variable,
+.tiptap .hljs-type,
+.tiptap .hljs-selector-class,
+.tiptap .hljs-selector-attr,
+.tiptap .hljs-selector-pseudo,
+.tiptap .hljs-number {
+  color: #d19a66;
+}
+
+.tiptap .hljs-symbol,
+.tiptap .hljs-bullet,
+.tiptap .hljs-link,
+.tiptap .hljs-meta,
+.tiptap .hljs-selector-id,
+.tiptap .hljs-title,
+.tiptap .hljs-property {
+  color: #61afef;
+}
+
+.tiptap .hljs-built_in,
+.tiptap .hljs-title.class_,
+.tiptap .hljs-class .hljs-title {
+  color: #e5c07b;
+}
+
+.tiptap .hljs-emphasis {
+  font-style: italic;
+}
+
+.tiptap .hljs-strong {
+  font-weight: 700;
+}
+
+/* ------------------------------------------------------------------ tables */
+
+.tiptap .tableWrapper {
+  margin: 0 0 0.8em;
+  overflow-x: auto;
+}
+
+.tiptap table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 0;
+}
+
+.tiptap td,
+.tiptap th {
+  position: relative;
+  min-width: 1em;
+  padding: 4px 8px;
+  border: 1px solid var(--border-strong);
+  vertical-align: top;
+  text-align: left;
+}
+
+.tiptap th {
+  background: var(--surface-2);
+  font-weight: 600;
+}
+
+.tiptap td > p,
+.tiptap th > p {
+  margin: 0;
+}
+
+.tiptap .selectedCell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: rgba(26, 115, 232, 0.16);
+  pointer-events: none;
+}
+
+.tiptap .column-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  bottom: -2px;
+  width: 4px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+.tiptap.resize-cursor {
+  cursor: col-resize;
+}
+
+/* ------------------------------------------------------------------ images (with resize handles) */
+
+.tiptap img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.tiptap [data-resize-container] {
+  max-width: 100%;
+  margin: 0 0 0.6em;
+}
+
+.tiptap [data-resize-wrapper] {
+  max-width: 100%;
+}
+
+.tiptap [data-resize-container].ProseMirror-selectednode [data-resize-wrapper],
+.tiptap img.ProseMirror-selectednode {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.tiptap [data-resize-handle] {
+  z-index: 3;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.tiptap [data-resize-container]:hover [data-resize-handle],
+.tiptap [data-resize-container].ProseMirror-selectednode [data-resize-handle],
+.tiptap [data-resize-container][data-resize-state='true'] [data-resize-handle] {
+  opacity: 1;
+}
+
+.tiptap [data-resize-handle='top-left'],
+.tiptap [data-resize-handle='top-right'],
+.tiptap [data-resize-handle='bottom-left'],
+.tiptap [data-resize-handle='bottom-right'] {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #fff;
+  border-radius: 3px;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+.tiptap [data-resize-handle='top-left'] {
+  transform: translate(-50%, -50%);
+  cursor: nwse-resize;
+}
+
+.tiptap [data-resize-handle='top-right'] {
+  transform: translate(50%, -50%);
+  cursor: nesw-resize;
+}
+
+.tiptap [data-resize-handle='bottom-left'] {
+  transform: translate(-50%, 50%);
+  cursor: nesw-resize;
+}
+
+.tiptap [data-resize-handle='bottom-right'] {
+  transform: translate(50%, 50%);
+  cursor: nwse-resize;
+}
+
+.tiptap [data-resize-handle='top'],
+.tiptap [data-resize-handle='bottom'] {
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.tiptap [data-resize-handle='left'],
+.tiptap [data-resize-handle='right'] {
+  width: 6px;
+  cursor: ew-resize;
+}
+
+/* ------------------------------------------------------------------ custom nodes */
+
+.tiptap .page-break {
+  position: relative;
+  height: 0;
+  margin: 28px 0;
+  border-top: 1px dashed var(--border-strong);
+  cursor: pointer;
+}
+
+.tiptap .page-break::after {
+  content: 'Page break';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 0 10px;
+  background: var(--paper, var(--surface));
+  color: var(--text-muted);
+  font: 11px var(--font-ui);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tiptap .page-break.ProseMirror-selectednode {
+  border-top-color: var(--accent);
+}
+
+.tiptap .toc {
+  margin: 0 0 1em;
+  padding: 10px 16px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-family: var(--font-ui);
+  font-size: 0.95em;
+}
+
+.tiptap .toc.ProseMirror-selectednode {
+  outline: 2px solid var(--accent);
+}
+
+.toc-title {
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.toc-list {
+  margin: 0 !important;
+  padding: 0 !important;
+  list-style: none;
+}
+
+.toc-list li {
+  padding: 1px 0;
+}
+
+.toc-list a {
+  color: var(--accent-text) !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+}
+
+.toc-list a:hover {
+  text-decoration: underline !important;
+}
+
+.toc-level-2 {
+  padding-left: 1.2em !important;
+}
+
+.toc-level-3 {
+  padding-left: 2.4em !important;
+}
+
+.toc-level-4,
+.toc-level-5,
+.toc-level-6 {
+  padding-left: 3.6em !important;
+  font-size: 0.95em;
+}
+
+.toc-empty {
+  margin: 0 !important;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Collapsible sections (details/summary). */
+.tiptap .details {
+  display: flex;
+  gap: 0.25rem;
+  margin: 0 0 0.8em;
+  padding: 0.4rem 0.6rem 0.4rem 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.tiptap .details > button {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-top: 0.05rem;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  cursor: pointer;
+}
+
+.tiptap .details > button:hover {
+  background: var(--hover);
+}
+
+.tiptap .details > button::before {
+  content: '\25B6';
+  transition: transform 0.15s;
+}
+
+.tiptap .details.is-open > button::before {
+  transform: rotate(90deg);
+}
+
+.tiptap .details > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.tiptap .details summary {
+  display: block;
+  font-weight: 600;
+  list-style: none;
+}
+
+.tiptap .details summary::-webkit-details-marker {
+  display: none;
+}
+
+.tiptap .details [data-type='detailsContent'] > :last-child {
+  margin-bottom: 0.2em;
+}
+
+.tiptap .mention {
+  padding: 0 3px;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 500;
+  white-space: nowrap;
+  box-decoration-break: clone;
+}
+
+/* ------------------------------------------------------------------ decorations */
+
+.tiptap .comment-mark {
+  background: rgba(251, 188, 4, 0.28);
+  border-bottom: 2px solid rgba(240, 170, 0, 0.85);
+  cursor: pointer;
+}
+
+.tiptap .comment-mark-active {
+  background: rgba(251, 188, 4, 0.55);
+}
+
+/* The text of a comment that is still being written. */
+.tiptap .comment-mark-pending {
+  border-bottom-style: dashed;
+}
+
+.tiptap .search-match {
+  background: rgba(255, 214, 0, 0.5);
+  border-radius: 2px;
+}
+
+.tiptap .search-match-current {
+  background: #ff9632;
+  box-shadow: 0 0 0 1px #e8710a;
+}
+
+/* Keeps the selection visible while a toolbar control has focus. */
+.tiptap .selection {
+  background: rgba(26, 115, 232, 0.22);
+}
+
+.tiptap p.is-empty::before,
+.tiptap h1.is-empty::before,
+.tiptap h2.is-empty::before,
+.tiptap h3.is-empty::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--text-muted);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.tiptap .ProseMirror-selectednode:not([data-resize-container]):not(img) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Other people's cursors and names. */
+.collaboration-carets__caret {
+  position: relative;
+  margin-left: -1px;
+  margin-right: -1px;
+  border-left: 1px solid;
+  border-right: 1px solid;
+  pointer-events: none;
+  word-break: normal;
+}
+
+.collaboration-carets__label {
+  position: absolute;
+  top: -1.35em;
+  left: -1px;
+  padding: 1px 5px;
+  border-radius: 4px 4px 4px 0;
+  color: #fff;
+  font: 600 11px/1.3 var(--font-ui);
+  font-style: normal;
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ suggestion popups (/ commands, @mentions) */
+
+.suggestion-popup {
+  z-index: 60;
+}
+
+.suggestion-list {
+  min-width: 260px;
+  max-width: 340px;
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+  font: 14px var(--font-ui);
+}
+
+.suggestion-group {
+  padding: 8px 8px 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.suggestion-item.selected {
+  background: var(--active);
+}
+
+.suggestion-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.suggestion-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.suggestion-text small {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestion-empty {
+  padding: 8px;
+  color: var(--text-muted);
+}
+
+/* ------------------------------------------------------------------ bubble menu */
+
+/* TipTap's React wrapper sets an inline "position: absolute" before the first placement, which would then be measured
+   against .bubble-host instead of the viewport; the menus always use floating-ui's "fixed" strategy. */
+.bubble-menu {
+  position: fixed !important;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.bubble-menu .icon-btn {
+  width: 30px;
+  height: 30px;
+}
+
+.bubble-menu-divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 2px;
+  background: var(--border);
+}
+
+.link-bubble {
+  max-width: 440px;
+  padding-left: 10px;
+}
+
+.link-bubble-url {
+  max-width: 280px;
+  margin-right: 4px;
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ find and replace */
+
+/* Floats over the top right of the editing area (its parent must be positioned). */
+.find-bar {
+  position: absolute;
+  top: 8px;
+  right: 24px;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 6px 4px;
+  max-width: calc(100% - 32px);
+  padding: 6px 8px 6px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.find-bar > :first-child {
+  grid-row: 1;
+  grid-column: 1;
+}
+
+.find-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  grid-column: 2;
+  min-width: 0;
+}
+
+.find-bar-replace .btn {
+  margin-left: 4px;
+}
+
+/* ------------------------------------------------------------------ comments (shared by documents and Loop pages) */
+
+.comments-toggle {
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+
+.comments-badge {
+  position: absolute;
+  top: 3px;
+  right: 1px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Bubble menus are placed here, outside the zoomed page, so that their positions are not scaled. */
+.bubble-host {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 40;
+}
+
+.comments-panel {
+  width: 340px;
+  background: var(--bg);
+}
+
+.comments-panel .side-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.comments-panel-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.comments-panel-tools select {
+  height: 28px;
+  padding: 0 6px;
+  font-size: 13px;
+}
+
+.comments-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 40px 16px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.comment-card {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  transition: box-shadow 0.12s;
+}
+
+.comment-card:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.comment-card-active {
+  border-color: transparent;
+  box-shadow: var(--shadow);
+  cursor: default;
+}
+
+.comment-card-active:hover {
+  box-shadow: var(--shadow);
+}
+
+.comment-card-new {
+  border-color: var(--accent);
+}
+
+.comment-card-resolved {
+  opacity: 0.75;
+}
+
+.comment-quote {
+  display: -webkit-box;
+  margin: 0 0 8px;
+  padding: 1px 0 1px 8px;
+  border-left: 3px solid #f0aa00;
+  color: var(--text-muted);
+  font-size: 13px;
+  overflow: hidden;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.comment-quote-deleted {
+  border-left-color: var(--border-strong);
+  text-decoration: line-through;
+}
+
+.comment-entry + .comment-entry {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.comment-entry-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.comment-entry-meta {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.comment-entry-meta strong {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comment-entry-meta time {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.comment-text {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.comment-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.comment-composer textarea {
+  width: 100%;
+  resize: none;
+}
+
+.comment-composer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.comment-resolved-note {
+  margin: 8px 0 0;
+  color: var(--success);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* The comments panel overlays the page on small screens; its container must be positioned. */
+@media (max-width: 900px) {
+  .comments-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 15;
+    max-width: calc(100% - 24px);
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+/* ------------------------------------------------------------------ color palette and table picker (menus) */
+
+.color-palette {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 6px 12px 8px;
+}
+
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 20px);
+  gap: 4px;
+}
+
+.color-swatch {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+  color: #fff;
+  cursor: pointer;
+}
+
+.color-swatch:hover {
+  transform: scale(1.15);
+}
+
+.color-swatch[aria-pressed='true'] {
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.15),
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--accent);
+}
+
+.color-swatch svg {
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.9));
+}
+
+.color-custom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.table-picker {
+  padding: 6px 12px 4px;
+}
+
+.table-picker-grid {
+  display: grid;
+  gap: 3px;
+  outline: none;
+}
+
+.table-picker-grid:focus-visible {
+  border-radius: 2px;
+  box-shadow: var(--focus);
+}
+
+.table-picker-cell {
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.table-picker-cell.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.table-picker-size {
+  padding-top: 6px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+@media print {
+  .tiptap .page-break {
+    height: 0;
+    margin: 0;
+    border: none;
+    break-after: page;
+  }
+
+  .tiptap .page-break::after,
+  .collaboration-carets__caret,
+  .tiptap .details > button {
+    display: none;
+  }
+
+  .tiptap .comment-mark,
+  .tiptap .comment-mark-active,
+  .tiptap .search-match,
+  .tiptap .search-match-current,
+  .tiptap .selection {
+    background: none;
+    border: none;
+    box-shadow: none;
+  }
+
+  .tiptap pre {
+    white-space: pre-wrap;
+    break-inside: avoid;
+  }
+}
