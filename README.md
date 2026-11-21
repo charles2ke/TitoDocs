@@ -115,6 +115,7 @@ Set these environment variables to configure the server:
 
 **Sign-ups and rate limits.** Anyone who can reach the server can create an account. Once everyone has signed up, set `ALLOW_REGISTRATION=false`. The server allows:
 - 10 sign-in attempts per user and address every 15 minutes.
+- 30 sign-in attempts per address every 15 minutes, across all users.
 - 20 sign-ups per address per hour.
 
 **Behind a reverse proxy:**

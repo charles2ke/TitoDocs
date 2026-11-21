@@ -1,5 +1,61 @@
 import { readFile } from 'node:fs/promises';
+import type { Locator, Page, Route } from '@playwright/test';
 import { createFile, docEditor, expect, pickMenu, snap, test, waitForSync } from './fixtures.ts';
+
+// A 1×1 PNG image.
+const PNG = [
+  137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, 181, 28, 12, 2, 0,
+  0, 0, 11, 73, 68, 65, 84, 120, 218, 99, 100, 96, 0, 2, 0, 0, 5, 0, 1, 161, 67, 55, 39, 0, 0, 0, 0, 73, 69, 78, 68, 174,
+  66, 96, 130,
+];
+
+/** Pastes PNG images with the given names, as if copied from a file manager. */
+async function pasteImages(editor: Locator, names: string[]): Promise<void> {
+  await editor.evaluate(
+    (element, [bytes, list]) => {
+      const clipboardData = new DataTransfer();
+      for (const name of list) clipboardData.items.add(new File([new Uint8Array(bytes)], `${name}.png`, { type: 'image/png' }));
+      element.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }));
+    },
+    [PNG, names] as const,
+  );
+}
+
+/** The text of each block, or `image <name>` for images. */
+const blocksWithImages = (editor: Locator): Promise<string[]> =>
+  editor.evaluate((root) =>
+    Array.from(root.children, (block) => {
+      const image = block.querySelector('img');
+      return image ? `image ${image.alt}` : (block.textContent ?? '');
+    }),
+  );
+
+/** Holds the next image uploads until `release` is called. `started` resolves once one is waiting. */
+async function holdUploads(page: Page): Promise<{ started: Promise<void>; release: () => Promise<void> }> {
+  let notifyStarted!: () => void;
+  let releaseHeld!: () => void;
+  const started = new Promise<void>((resolve) => (notifyStarted = resolve));
+  const held = new Promise<void>((resolve) => (releaseHeld = resolve));
+  const handling: Promise<void>[] = [];
+  const handler = (route: Route) => {
+    const handled = (async () => {
+      notifyStarted();
+      await held;
+      await route.continue();
+    })();
+    handling.push(handled);
+    return handled;
+  };
+  await page.route('**/api/uploads', handler);
+  return {
+    started,
+    release: async () => {
+      releaseHeld();
+      await Promise.all(handling);
+      await page.unroute('**/api/uploads', handler);
+    },
+  };
+}
 
 test('writes and formats a new document that is still there after a reload', async ({ page }) => {
   await page.goto('/');
@@ -15,6 +71,8 @@ test('writes and formats a new document that is still there after a reload', asy
   await editor.click();
   await page.getByTestId('paragraph-style').click();
   await page.getByRole('menuitemcheckbox', { name: /^Heading 1/ }).click();
+  // The menu hands focus back to the editor on the next frame; typing before then would be lost.
+  await expect(editor).toBeFocused();
   await page.keyboard.type('Quarterly report');
   await page.keyboard.press('Enter');
   await page.keyboard.type('Revenue grew by ');
@@ -67,47 +125,87 @@ test('keeps pasted images at their mapped insertion point during upload', async 
   await page.keyboard.press('Home');
   for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowRight');
 
-  let releaseUpload!: () => void;
-  let notifyUploadStarted!: () => void;
-  const uploadStarted = new Promise<void>((resolve) => {
-    notifyUploadStarted = resolve;
-  });
-  const uploadHeld = new Promise<void>((resolve) => {
-    releaseUpload = resolve;
-  });
-  await page.route('**/api/uploads', async (route) => {
-    notifyUploadStarted();
-    await uploadHeld;
-    await route.continue();
-  });
-  await editor.evaluate((element) => {
-    const clipboardData = new DataTransfer();
-    clipboardData.items.add(
-      new File(
-        [
-          new Uint8Array([
-            137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4,
-            0, 0, 0, 181, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, 218, 99, 100, 96, 0, 2, 0, 0, 5, 0,
-            1, 161, 67, 55, 39, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
-          ]),
-        ],
-        'anchor.png',
-        { type: 'image/png' },
-      ),
-    );
-    element.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }));
-  });
-  await uploadStarted;
+  const upload = await holdUploads(page);
+  await pasteImages(editor, ['anchor']);
+  await upload.started;
   await page.keyboard.type('typed ');
-  releaseUpload();
+  await upload.release();
 
   await expect(editor.locator('img[alt="anchor"]')).toHaveCount(1);
-  expect(
-    await editor.evaluate((root) =>
-      Array.from(root.children, (child) => (child.querySelector('img') ? 'image' : child.textContent?.trim())),
-    ),
-  ).toEqual(['alpha typed', 'image', 'omega']);
-  await page.unroute('**/api/uploads');
+  expect(await blocksWithImages(editor)).toEqual(['alpha typed ', 'image anchor', 'omega']);
+});
+
+test('inserts several pasted images in order and keeps writing after them', async ({ page }) => {
+  const file = await createFile(page, { type: 'doc', title: 'Image order' });
+  await page.goto(`/d/${file.id}`);
+  await waitForSync(page);
+  const editor = docEditor(page);
+  await editor.click();
+  await page.keyboard.type('alpha');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('omega');
+
+  // On an empty line…
+  await page.keyboard.press('ArrowUp');
+  await pasteImages(editor, ['first', 'second']);
+  await expect(editor.locator('img')).toHaveCount(2);
+  await page.keyboard.type('below');
+  // …and at the end of a paragraph.
+  await page.keyboard.press('ControlOrMeta+End');
+  await pasteImages(editor, ['third', 'fourth']);
+  await expect(editor.locator('img')).toHaveCount(4);
+  await page.keyboard.type('end');
+
+  expect(await blocksWithImages(editor)).toEqual([
+    'alpha',
+    'image first',
+    'image second',
+    'below',
+    'omega',
+    'image third',
+    'image fourth',
+    'end',
+  ]);
+});
+
+test('leaves the cursor alone when someone writes elsewhere while images upload', async ({ page }) => {
+  const file = await createFile(page, { type: 'doc', title: 'Image cursor' });
+  await page.goto(`/d/${file.id}`);
+  await waitForSync(page);
+  const editor = docEditor(page);
+  await editor.click();
+  await page.keyboard.type('alpha');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('omega');
+  await page.keyboard.press('ArrowUp');
+
+  // Writing somewhere else in the document.
+  let upload = await holdUploads(page);
+  await pasteImages(editor, ['moved']);
+  await upload.started;
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.keyboard.type(' typed');
+  await upload.release();
+  await expect(editor.locator('img')).toHaveCount(1);
+  await page.keyboard.type(' on');
+  expect(await blocksWithImages(editor)).toEqual(['alpha', 'image moved', '', 'omega typed on']);
+
+  // Writing in the file name.
+  upload = await holdUploads(page);
+  await pasteImages(editor, ['renamed']);
+  await upload.started;
+  const title = page.getByRole('textbox', { name: 'File name' });
+  await title.click();
+  await title.press('End');
+  await page.keyboard.type(' renamed');
+  await upload.release();
+  await expect(editor.locator('img')).toHaveCount(2);
+  await page.keyboard.type(' twice');
+  await expect(title).toBeFocused();
+  await expect(title).toHaveValue('Image cursor renamed twice');
+  expect(await blocksWithImages(editor)).toEqual(['alpha', 'image moved', '', 'omega typed on', 'image renamed', '']);
 });
 
 test('comments on selected text, replies and resolves the thread', async ({ page }) => {

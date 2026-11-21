@@ -1,4 +1,4 @@
-import { Extension, type AnyExtension, type Editor } from '@tiptap/core';
+import { Extension, type AnyExtension, type Editor, type JSONContent } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { TextStyleKit } from '@tiptap/extension-text-style';
 import Highlight from '@tiptap/extension-highlight';
@@ -16,7 +16,8 @@ import InvisibleCharacters from '@tiptap/extension-invisible-characters';
 import Collaboration from '@tiptap/extension-collaboration';
 import CollaborationCaret from '@tiptap/extension-collaboration-caret';
 import FileHandler from '@tiptap/extension-file-handler';
-import { Plugin, PluginKey, Selection as ProseMirrorSelection } from '@tiptap/pm/state';
+import { NodeSelection, Plugin, PluginKey } from '@tiptap/pm/state';
+import type { Mappable } from '@tiptap/pm/transform';
 import { common, createLowlight } from 'lowlight';
 import { RICH_FIELD } from '@shared/types';
 import { api } from '../api';
@@ -34,8 +35,13 @@ export const lowlight = createLowlight(common);
 
 export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 
-type ImageAnchor = { from: number; to: number };
-type ImageAnchorMeta = { add?: { id: string; anchor: ImageAnchor }; remove?: string[]; set?: { id: string; anchor: ImageAnchor } };
+type DocRange = { from: number; to: number };
+/** Where uploading images will go, and where the cursor was when they were added. Both follow later edits. */
+type ImageAnchor = { at: DocRange; cursor: DocRange };
+type ImageAnchorMeta = { add?: { id: string; anchor: ImageAnchor }; remove?: string };
+
+// Maps like the selection does, so an untouched cursor still matches.
+const mapRange = ({ from, to }: DocRange, mapping: Mappable): DocRange => ({ from: mapping.map(from, 1), to: mapping.map(to, 1) });
 
 const imageAnchorsKey = new PluginKey<Map<string, ImageAnchor>>('imageUploadAnchors');
 const imageAnchorsPlugin = new Plugin({
@@ -43,19 +49,14 @@ const imageAnchorsPlugin = new Plugin({
   state: {
     init: () => new Map<string, ImageAnchor>(),
     apply(transaction, previous) {
-      const anchors = new Map(
-        [...previous].map(([id, anchor]) => [
-          id,
-          {
-            from: transaction.mapping.map(anchor.from, 1),
-            to: transaction.mapping.map(anchor.to, 1),
-          },
-        ]),
-      );
       const meta = transaction.getMeta(imageAnchorsKey) as ImageAnchorMeta | undefined;
-      for (const id of meta?.remove ?? []) anchors.delete(id);
+      if (!meta && !transaction.docChanged) return previous;
+      const anchors = new Map<string, ImageAnchor>();
+      for (const [id, { at, cursor }] of previous) {
+        anchors.set(id, { at: mapRange(at, transaction.mapping), cursor: mapRange(cursor, transaction.mapping) });
+      }
+      if (meta?.remove) anchors.delete(meta.remove);
       if (meta?.add) anchors.set(meta.add.id, meta.add.anchor);
-      if (meta?.set) anchors.set(meta.set.id, meta.set.anchor);
       return anchors;
     },
   },
@@ -78,40 +79,54 @@ export interface EditorSetup {
   extra?: AnyExtension[];
 }
 
-/** Uploads pasted or dropped images and inserts them at their mapped document position. */
+/** Whether keyboard focus is in a text field outside the editor, such as the file name or a comment box. */
+function typingElsewhere(editor: Editor): boolean {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement) || editor.view.dom.contains(active)) return false;
+  return active.isContentEditable || active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement;
+}
+
+function placeImages(editor: Editor, images: JSONContent[], { at, cursor }: ImageAnchor) {
+  const { doc, schema, selection } = editor.state;
+  // The cursor moves past the images only if it has not been moved since they were added.
+  const follow = selection.from === cursor.from && selection.to === cursor.to && !typingElsewhere(editor);
+  const $at = doc.resolve(at.from);
+  const index = $at.depth > 0 ? $at.index(-1) : 0;
+  // Images added on an empty line go above it, so writing can continue below them.
+  const onEmptyLine =
+    at.from === at.to &&
+    $at.depth > 0 &&
+    $at.parent.isTextblock &&
+    $at.parent.content.size === 0 &&
+    $at.node(-1).canReplaceWith(index, index, schema.nodes.image);
+  editor.chain().insertContentAt(onEmptyLine ? $at.before() : at, images, { updateSelection: follow }).run();
+  if (!follow) return;
+  const after = editor.state.selection;
+  // Leave a text cursor after the images rather than a selected image that typing would replace.
+  if (after instanceof NodeSelection && after.node.type === schema.nodes.image && editor.state.doc.resolve(after.to).nodeAfter?.isTextblock) {
+    editor.commands.setTextSelection(after.to + 1);
+  }
+  editor.view.focus();
+}
+
+/** Uploads pasted, dropped or picked images and inserts them in order where they were added, even if the document changes meanwhile. */
 export async function insertImages(editor: Editor, files: File[], pos: number | null, onError?: (error: unknown) => void) {
   const id = crypto.randomUUID();
-  const selection = editor.state.selection;
-  const from = pos ?? selection.from;
-  const to = pos === null ? selection.to : pos;
-  editor.view.dispatch(editor.state.tr.setMeta(imageAnchorsKey, { add: { id, anchor: { from, to } } }));
+  const { from, to } = editor.state.selection;
+  const anchor: ImageAnchor = { at: pos === null ? { from, to } : { from: pos, to: pos }, cursor: { from, to } };
+  editor.view.dispatch(editor.state.tr.setMeta(imageAnchorsKey, { add: { id, anchor } }));
   try {
-    for (const file of files) {
-      try {
-        const src = await api.upload(file);
-        if (editor.isDestroyed) break;
-        const anchor = imageAnchorsKey.getState(editor.state)?.get(id);
-        if (!anchor) break;
-        const image = editor.schema.nodes.image.create({
-          src,
-          alt: file.name.replace(/\.[^.]+$/, ''),
-        });
-        const nextPosition = anchor.from + image.nodeSize;
-        const transaction = editor.state.tr.replaceRangeWith(anchor.from, anchor.to, image);
-        transaction.setSelection(ProseMirrorSelection.near(transaction.doc.resolve(nextPosition), 1));
-        editor.view.dispatch(transaction);
-        editor.view.focus();
-        editor.view.dispatch(
-          editor.state.tr.setMeta(imageAnchorsKey, { set: { id, anchor: { from: nextPosition, to: nextPosition } } }),
-        );
-      } catch (error) {
-        onError?.(error);
-      }
-    }
+    const uploads = await Promise.allSettled(files.map((file) => api.upload(file)));
+    const images: JSONContent[] = [];
+    uploads.forEach((upload, index) => {
+      if (upload.status === 'rejected') onError?.(upload.reason);
+      else images.push({ type: 'image', attrs: { src: upload.value, alt: files[index].name.replace(/\.[^.]+$/, '') } });
+    });
+    if (!images.length || editor.isDestroyed || !editor.isEditable) return;
+    const current = imageAnchorsKey.getState(editor.state)?.get(id);
+    if (current) placeImages(editor, images, current);
   } finally {
-    if (!editor.isDestroyed) {
-      editor.view.dispatch(editor.state.tr.setMeta(imageAnchorsKey, { remove: [id] }));
-    }
+    if (!editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta(imageAnchorsKey, { remove: id }));
   }
 }
 
