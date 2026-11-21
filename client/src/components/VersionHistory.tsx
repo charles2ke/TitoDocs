@@ -115,7 +115,7 @@ export function VersionHistory({ file, renderPreview, onRestore, onClose }: Vers
   return (
     <div className="version-history" role="dialog" aria-modal="true" aria-label="Version history" data-testid="version-history">
       <header className="version-history-header">
-        <button ref={closeButton} type="button" className="icon-btn" aria-label="Back to document" title="Back" onClick={onClose}>
+        <button ref={closeButton} type="button" className="icon-btn" aria-label="Close version history" title="Close version history" onClick={onClose}>
           <ArrowLeft size={20} />
         </button>
         <div className="version-history-title">

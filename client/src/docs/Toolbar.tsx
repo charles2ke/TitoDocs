@@ -1,10 +1,9 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import type { Editor } from '@tiptap/core';
 import { useEditorState } from '@tiptap/react';
 import {
   ArrowUpDown,
   Bold,
-  ChevronDown,
   Eye,
   Highlighter,
   ImagePlus,
@@ -30,7 +29,8 @@ import {
   Underline,
   Undo2,
 } from 'lucide-react';
-import { Dropdown, type MenuEntry } from '../components/Menu';
+import { Dropdown } from '../components/Menu';
+import { ToolButton, ToolDivider, ToolDropdown } from '../components/Toolbar';
 import { ColorPalette } from '../editor/ColorPalette';
 import { clearFormatting, FONT_FAMILIES, fontStack, MAX_FONT_SIZE, MIN_FONT_SIZE, stepFontSize } from '../editor/commands';
 import { shortcut } from '../lib/util';
@@ -50,62 +50,6 @@ export const ALIGNMENT_ICONS: Record<Alignment, typeof TextAlignStart> = {
   right: TextAlignEnd,
   justify: TextAlignJustify,
 };
-
-interface ToolButtonProps {
-  label: string;
-  keys?: string;
-  icon: ReactNode;
-  active?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-  testId?: string;
-}
-
-/** A toolbar button that keeps the focus (and selection) in the editor. */
-function ToolButton({ label, keys, icon, active, disabled, onClick, testId }: ToolButtonProps) {
-  return (
-    <button
-      type="button"
-      className={`tool-btn ${active ? 'active' : ''}`}
-      aria-label={label}
-      aria-pressed={active}
-      title={keys ? `${label} (${shortcut(keys)})` : label}
-      disabled={disabled}
-      onMouseDown={(event) => event.preventDefault()}
-      onClick={onClick}
-      data-testid={testId}
-    >
-      {icon}
-    </button>
-  );
-}
-
-const Divider = () => <span className="tool-divider" aria-hidden="true" />;
-
-interface ToolDropdownProps {
-  label: string;
-  items: MenuEntry[] | (() => MenuEntry[]);
-  children: ReactNode;
-  className?: string;
-  testId?: string;
-  align?: 'start' | 'end';
-}
-
-function ToolDropdown({ label, items, children, className = '', testId, align }: ToolDropdownProps) {
-  return (
-    <Dropdown
-      label={label}
-      items={items}
-      align={align}
-      trigger={(props) => (
-        <button type="button" className={`tool-btn tool-dropdown ${className}`} aria-label={label} title={label} data-testid={testId} {...props}>
-          {children}
-          <ChevronDown size={14} className="tool-chevron" />
-        </button>
-      )}
-    />
-  );
-}
 
 function FontSizeControl({ editor, size }: { editor: Editor; size: number }) {
   const [draft, setDraft] = useState(String(size));
@@ -194,7 +138,7 @@ export function Toolbar(props: ToolbarProps) {
   const AlignIcon = ALIGNMENT_ICONS[state.align];
 
   return (
-    <div className="doc-toolbar no-print" role="toolbar" aria-label="Formatting" data-testid="doc-toolbar">
+    <div className="app-toolbar no-print" role="toolbar" aria-label="Formatting" data-testid="doc-toolbar">
       {state.editable && (
         <>
           <ToolButton label="Undo" keys="Mod-z" icon={<Undo2 size={18} />} disabled={!state.canUndo} onClick={() => chain().undo().run()} />
@@ -221,7 +165,7 @@ export function Toolbar(props: ToolbarProps) {
 
       {state.editable && (
         <>
-          <Divider />
+          <ToolDivider />
           <ToolDropdown
             label="Styles"
             className="tool-style"
@@ -238,7 +182,7 @@ export function Toolbar(props: ToolbarProps) {
           >
             <span className="tool-label">{state.styleLabel}</span>
           </ToolDropdown>
-          <Divider />
+          <ToolDivider />
           <ToolDropdown
             label="Font"
             className="tool-font"
@@ -254,9 +198,9 @@ export function Toolbar(props: ToolbarProps) {
           >
             <span className="tool-label">{state.fontFamily}</span>
           </ToolDropdown>
-          <Divider />
+          <ToolDivider />
           <FontSizeControl editor={editor} size={state.fontSize} />
-          <Divider />
+          <ToolDivider />
           <ToolButton label="Bold" keys="Mod-b" icon={<Bold size={18} />} active={state.bold} onClick={() => chain().toggleBold().run()} testId="tool-bold" />
           <ToolButton label="Italic" keys="Mod-i" icon={<Italic size={18} />} active={state.italic} onClick={() => chain().toggleItalic().run()} />
           <ToolButton
@@ -332,7 +276,7 @@ export function Toolbar(props: ToolbarProps) {
               </button>
             )}
           />
-          <Divider />
+          <ToolDivider />
           <ToolButton label="Insert link" keys="Mod-k" icon={<Link size={18} />} active={state.link} onClick={props.onLink} testId="tool-link" />
         </>
       )}
@@ -353,7 +297,7 @@ export function Toolbar(props: ToolbarProps) {
               </button>
             )}
           />
-          <Divider />
+          <ToolDivider />
           <ToolDropdown
             label="Align"
             items={() =>

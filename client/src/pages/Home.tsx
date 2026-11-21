@@ -31,7 +31,7 @@ import { ShareDialog } from '../components/ShareDialog';
 import { useToast } from '../components/Toast';
 import { EmptyState, FileTypeIcon, Logo, Spinner } from '../components/ui';
 import { UserMenu } from '../components/AppHeader';
-import { DOC_IMPORT_ACCEPT, DOC_IMPORT_EXTENSIONS, extensionOf, stripExtension } from '../lib/files';
+import { DOC_IMPORT_ACCEPT, DOC_IMPORT_EXTENSIONS, extensionOf, readTextFile, stripExtension } from '../lib/files';
 import { CODE_TEMPLATES, DOC_TEMPLATES, setInitialContent, type InitialContent } from '../lib/templates';
 import { TYPE_LABELS, fileUrl, formatTime, pickFile, useDebounced } from '../lib/util';
 
@@ -104,14 +104,13 @@ export function Home() {
   const importFile = async (file: File) => {
     setBusy(true);
     try {
-      const importers = await import('../docs/importers');
       const extension = extensionOf(file.name);
       if (DOC_IMPORT_EXTENSIONS.includes(extension) && extension !== 'txt') {
-        const html = await importers.fileToHtml(file);
-        await create({ type: 'doc', title: stripExtension(file.name) }, { kind: 'html', html });
+        const { fileToHtml } = await import('../docs/importers');
+        await create({ type: 'doc', title: stripExtension(file.name) }, { kind: 'html', html: await fileToHtml(file) });
       } else {
-        const text = await importers.readTextFile(file);
-        await create({ type: 'code', title: file.name }, { kind: 'text', text });
+        const { text, encoding } = await readTextFile(file);
+        await create({ type: 'code', title: file.name }, { kind: 'text', text, encoding });
       }
     } catch (error) {
       toast.show(`Could not open ${file.name}: ${errorMessage(error)}`, { kind: 'error' });

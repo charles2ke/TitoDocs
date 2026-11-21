@@ -1,6 +1,6 @@
 import DOMPurify from 'dompurify';
 import { api } from '../api';
-import { MAX_TEXT_FILE_BYTES, extensionOf } from '../lib/files';
+import { extensionOf } from '../lib/files';
 import { escapeHtml } from '../lib/util';
 
 /** Removes scripts, event handlers and other active content from imported HTML. */
@@ -71,11 +71,4 @@ export async function fileToHtml(file: File): Promise<string> {
   if (extension === 'md' || extension === 'markdown') return markdownToHtml(text);
   if (extension === 'html' || extension === 'htm') return sanitizeHtml(parseInert(text).innerHTML);
   return textToHtml(text);
-}
-
-export async function readTextFile(file: File): Promise<string> {
-  if (file.size > MAX_TEXT_FILE_BYTES) throw new Error('This file is too large to open (the limit is 5 MB).');
-  const buffer = new Uint8Array(await file.arrayBuffer());
-  if (buffer.subarray(0, 8000).includes(0)) throw new Error('This looks like a binary file, which cannot be opened as text.');
-  return new TextDecoder('utf-8').decode(buffer);
 }

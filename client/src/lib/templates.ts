@@ -1,8 +1,11 @@
+import type { TextEncodingName } from '../code/textOps';
+
 /**
  * Content waiting to be inserted into a freshly created file once its editor has connected
  * (templates and imported files). Kept in memory: navigation within the app is client-side.
+ * Imported text files also remember their encoding, which is used again when they are downloaded.
  */
-export type InitialContent = { kind: 'html'; html: string } | { kind: 'text'; text: string };
+export type InitialContent = { kind: 'html'; html: string } | { kind: 'text'; text: string; encoding?: TextEncodingName };
 
 const pending = new Map<string, InitialContent>();
 

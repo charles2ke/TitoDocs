@@ -783,52 +783,6 @@
   min-width: 0;
 }
 
-.find-input {
-  display: flex;
-  align-items: center;
-  width: 290px;
-  min-width: 0;
-  height: 30px;
-  padding-right: 2px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-}
-
-.find-input:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-
-.find-input.invalid {
-  border-color: var(--danger);
-  box-shadow: 0 0 0 1px var(--danger);
-}
-
-.find-input > input {
-  flex: 1;
-  height: 28px !important;
-  padding: 0 8px !important;
-  border: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-
-.find-input .icon-btn-sm {
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-sm);
-}
-
-.find-status {
-  min-width: 70px;
-  padding: 0 4px;
-  color: var(--text-muted);
-  font-size: 12px;
-  text-align: center;
-  white-space: nowrap;
-}
-
 .find-bar-replace .btn {
   margin-left: 4px;
 }

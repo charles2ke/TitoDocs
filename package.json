@@ -28,6 +28,7 @@
     "@codemirror/view": "^6.43.15",
     "@hocuspocus/provider": "^4.9.0",
     "@hocuspocus/server": "^4.9.0",
+    "@lezer/highlight": "^1.2.5",
     "@replit/codemirror-indentation-markers": "^6.5.3",
     "@replit/codemirror-minimap": "^0.5.2",
     "@tiptap/core": "^3.35.0",

@@ -14,6 +14,7 @@ import { toAwarenessUser, usePresence, useRoom, useRoomStatus, whenSynced, type 
 import { AppHeader } from '../components/AppHeader';
 import { ConfirmDialog, PromptDialog } from '../components/Dialog';
 import { MenuBar } from '../components/Menu';
+import { ShortcutsDialog } from '../components/ShortcutsDialog';
 import { useToast } from '../components/Toast';
 import { FileTypeIcon, FullPageSpinner, Spinner } from '../components/ui';
 import { VersionHistory } from '../components/VersionHistory';
@@ -27,10 +28,10 @@ import { basicSlashItems } from '../editor/slashItems';
 import { DOC_IMPORT_ACCEPT, stripExtension } from '../lib/files';
 import { setInitialContent, takeInitialContent } from '../lib/templates';
 import { useFile, useLiveFile, type FileState } from '../lib/useFile';
-import { downloadBlob, fileUrl, isMac, pickFile, safeFileName, useLocalStorage } from '../lib/util';
+import { downloadBlob, fileUrl, isMac, keyName, pickFile, safeFileName, useLocalStorage } from '../lib/util';
 import { FileGate, TrashedBanner } from '../pages/FileGate';
 import { CommentsPanel, useOpenCommentCount } from './CommentsPanel';
-import { PageSetupDialog, ShortcutsDialog, SpecialCharactersDialog, useTextStats, WordCountDialog } from './dialogs';
+import { DOC_SHORTCUTS, PageSetupDialog, SpecialCharactersDialog, useTextStats, WordCountDialog } from './dialogs';
 import { buildDocMenus, type DocDialog, type DownloadFormat } from './docMenus';
 import { stepSelectionFontSize, ZOOM_LEVELS, type DocMode } from './formatting';
 import { OutlinePanel } from './OutlinePanel';
@@ -91,13 +92,6 @@ function wordAt(editor: Editor): { from: number; to: number } | null {
   while (isWordChar(text[start - 1])) start -= 1;
   while (isWordChar(text[end])) end += 1;
   return start === end ? null : { from: $from.start() + start, to: $from.start() + end };
-}
-
-/** The key of a shortcut, independent of the characters that Shift and Alt produce on the keyboard layout. */
-function keyName(event: KeyboardEvent): string {
-  if (/^[a-z]$/i.test(event.key)) return event.key.toLowerCase();
-  if (/^Key[A-Z]$/.test(event.code)) return event.code.slice(3).toLowerCase();
-  return event.code;
 }
 
 export default function DocPage() {
@@ -631,7 +625,7 @@ function DocEditor({ state, file, room, commentsRoom }: DocEditorProps) {
       {dialog === 'wordCount' && (
         <WordCountDialog editor={editor} showWhileTyping={showWordCount} onShowWhileTyping={setShowWordCount} onClose={closeDialog} />
       )}
-      {dialog === 'shortcuts' && <ShortcutsDialog onClose={closeDialog} />}
+      {dialog === 'shortcuts' && <ShortcutsDialog groups={DOC_SHORTCUTS} onClose={closeDialog} />}
       {dialog === 'specialCharacters' && (
         <SpecialCharactersDialog onInsert={(character) => editor.commands.insertContent({ type: 'text', text: character })} onClose={closeDialog} />
       )}

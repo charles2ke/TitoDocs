@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 
 interface DialogProps {
@@ -13,9 +13,12 @@ interface DialogProps {
 /** A modal dialog built on the native <dialog> element (focus trapping and Escape handling for free). */
 export function Dialog({ title, onClose, children, footer, wide, className = '' }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
+  // The content is added once the dialog is open, as `autoFocus` can't focus anything in a closed dialog.
+  const [open, setOpen] = useState(false);
+  useLayoutEffect(() => {
     const dialog = ref.current;
     if (dialog && !dialog.open) dialog.showModal();
+    setOpen(true);
   }, []);
   return (
     <dialog
@@ -42,8 +45,8 @@ export function Dialog({ title, onClose, children, footer, wide, className = '' 
           <X size={18} />
         </button>
       </header>
-      <div className="dialog-body">{children}</div>
-      {footer && <footer className="dialog-footer">{footer}</footer>}
+      <div className="dialog-body">{open && children}</div>
+      {open && footer && <footer className="dialog-footer">{footer}</footer>}
     </dialog>
   );
 }

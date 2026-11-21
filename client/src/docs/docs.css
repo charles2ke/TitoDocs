@@ -210,75 +210,7 @@
   margin-top: 0;
 }
 
-/* ------------------------------------------------------------------ toolbar */
-
-.doc-toolbar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 2px;
-  min-height: 40px;
-  margin: 0 12px 8px;
-  padding: 4px 10px;
-  border-radius: 20px;
-  background: var(--surface-2);
-  flex-shrink: 0;
-}
-
-.tool-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  min-width: 28px;
-  height: 28px;
-  padding: 0 4px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--text);
-  font-size: 14px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.tool-btn:hover:not(:disabled) {
-  background: var(--hover);
-}
-
-.tool-btn.active,
-.tool-btn[aria-expanded='true'] {
-  background: var(--active);
-  color: var(--accent-text);
-}
-
-.tool-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.tool-divider {
-  width: 1px;
-  height: 20px;
-  margin: 0 4px;
-  background: var(--border-strong);
-}
-
-.tool-dropdown {
-  padding: 0 2px 0 6px;
-}
-
-.tool-chevron {
-  flex-shrink: 0;
-  color: var(--text-muted);
-}
-
-.tool-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: left;
-}
+/* ------------------------------------------------------------------ toolbar (shared rules are in app.css) */
 
 .tool-style .tool-label {
   width: 92px;
@@ -542,31 +474,6 @@
 
 /* ------------------------------------------------------------------ dialogs */
 
-.stats-table {
-  width: 100%;
-  margin-bottom: 14px;
-  border-collapse: collapse;
-}
-
-.stats-table th,
-.stats-table td {
-  padding: 7px 0;
-}
-
-.stats-table th {
-  font-weight: 400;
-  text-align: left;
-}
-
-.stats-table td {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.stats-table tr + tr {
-  border-top: 1px solid var(--border);
-}
-
 .page-setup fieldset {
   min-width: 0;
   margin: 0;
@@ -582,51 +489,6 @@
   font-weight: 500;
 }
 
-.segmented {
-  display: flex;
-}
-
-.segmented label {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  height: 32px;
-  padding: 0 16px;
-  border: 1px solid var(--border);
-  cursor: pointer;
-}
-
-.segmented label + label {
-  margin-left: -1px;
-}
-
-.segmented label:first-of-type {
-  border-radius: 16px 0 0 16px;
-}
-
-.segmented label:last-of-type {
-  border-radius: 0 16px 16px 0;
-}
-
-.segmented label:has(input:checked) {
-  z-index: 1;
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent-text);
-  font-weight: 500;
-}
-
-.segmented label:has(input:focus-visible) {
-  z-index: 2;
-  box-shadow: var(--focus);
-}
-
-.segmented input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
 .margins {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -635,44 +497,6 @@
 
 .margins input {
   width: 100%;
-}
-
-.shortcuts-search {
-  width: 100%;
-  margin-bottom: 14px;
-}
-
-.shortcuts-grid {
-  columns: 2 300px;
-  column-gap: 32px;
-}
-
-.shortcuts-grid section {
-  margin-bottom: 18px;
-  break-inside: avoid;
-}
-
-.shortcuts-grid h3 {
-  margin: 0 0 6px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.shortcuts-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.shortcuts-table td {
-  padding: 5px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.shortcuts-table td:last-child {
-  padding-left: 12px;
-  text-align: right;
-  white-space: nowrap;
 }
 
 .char-grid {

@@ -163,10 +163,18 @@ export function pickFile(accept: string): Promise<File | null> {
 
 export const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
+/** The key of a shortcut, independent of the characters that Shift and Alt produce on the keyboard layout. */
+export function keyName(event: KeyboardEvent): string {
+  if (/^[a-z]$/i.test(event.key)) return event.key.toLowerCase();
+  if (/^Key[A-Z]$/.test(event.code)) return event.code.slice(3).toLowerCase();
+  return event.code;
+}
+
 /** Formats a shortcut like "Mod-Shift-z" for display. */
 export const shortcut = (keys: string): string =>
   keys
-    .split('-')
+    // A trailing "-" is the minus key (Mod--).
+    .split(/-(?=.)/)
     .map((key) =>
       key === 'Mod' ? (isMac ? '⌘' : 'Ctrl') : key === 'Alt' && isMac ? '⌥' : key === 'Shift' && isMac ? '⇧' : key.length === 1 ? key.toUpperCase() : key,
     )

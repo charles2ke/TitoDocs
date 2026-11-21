@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { Editor } from '@tiptap/core';
 import { Dialog } from '../components/Dialog';
-import { shortcut } from '../lib/util';
+import type { ShortcutGroup } from '../components/ShortcutsDialog';
 import { DEFAULT_PAGE_SETUP, PAGE_SIZES, type Margins, type PageSetup, type PageSize } from './pageSetup';
 
 // ------------------------------------------------------------------ word count
@@ -229,7 +229,7 @@ export function PageSetupDialog({ setup, onApply, onClose }: PageSetupProps) {
 
 // ------------------------------------------------------------------ keyboard shortcuts
 
-const SHORTCUT_GROUPS: { title: string; items: [string, string][] }[] = [
+export const DOC_SHORTCUTS: ShortcutGroup[] = [
   {
     title: 'Common actions',
     items: [
@@ -284,47 +284,6 @@ const SHORTCUT_GROUPS: { title: string; items: [string, string][] }[] = [
     ],
   },
 ];
-
-export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
-  const [query, setQuery] = useState('');
-  const needle = query.trim().toLowerCase();
-  return (
-    <Dialog title="Keyboard shortcuts" onClose={onClose} wide>
-      <input
-        className="shortcuts-search"
-        type="search"
-        placeholder="Search keyboard shortcuts"
-        aria-label="Search keyboard shortcuts"
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        autoFocus
-      />
-      <div className="shortcuts-grid">
-        {SHORTCUT_GROUPS.map((group) => {
-          const items = group.items.filter(([label]) => label.toLowerCase().includes(needle));
-          if (!items.length) return null;
-          return (
-            <section key={group.title}>
-              <h3>{group.title}</h3>
-              <table className="shortcuts-table">
-                <tbody>
-                  {items.map(([label, keys]) => (
-                    <tr key={label}>
-                      <td>{label}</td>
-                      <td>
-                        <kbd className="kbd">{keys.length === 1 ? keys : shortcut(keys)}</kbd>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-          );
-        })}
-      </div>
-    </Dialog>
-  );
-}
 
 // ------------------------------------------------------------------ special characters
 

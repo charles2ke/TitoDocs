@@ -448,6 +448,7 @@ input[type='color'] {
 .menubar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0;
   margin-left: -6px;
 }
