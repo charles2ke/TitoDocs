@@ -101,4 +101,5 @@ export interface SearchResult extends FileMeta {
 export type StatelessMessage =
   | { type: 'meta'; file: Partial<FileMeta> & { id: string } }
   | { type: 'tree' }
-  | { type: 'deleted' };
+  /** The file was trashed, restored or deleted, or its sharing changed: clients re-check it. */
+  | { type: 'access' };

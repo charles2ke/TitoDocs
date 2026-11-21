@@ -14,6 +14,7 @@ import {
   pruneAutoVersions,
   storeState,
   toPublicUser,
+  type FileRow,
 } from './models.ts';
 import { extractText } from './text.ts';
 import { canComment, canEdit, commentsDocName, type PublicUser, type StatelessMessage } from '../shared/types.ts';
@@ -36,6 +37,15 @@ export function parseDocName(name: string): { fileId: string; kind: 'content' | 
   return null;
 }
 
+/** Whether someone may open one of a file's collaboration documents, and if so whether only to read it. */
+function documentAccess(db: DB, userId: string, file: FileRow, kind: 'content' | 'comments'): { readOnly: boolean } | null {
+  const role = getRole(db, userId, file);
+  if (!role) return null;
+  // Workspace documents only carry presence and server notifications.
+  if (file.trashed_at || file.type === 'workspace') return { readOnly: true };
+  return { readOnly: kind === 'comments' ? !canComment(role) : !canEdit(role) };
+}
+
 export interface Collab {
   hocuspocus: Hocuspocus<CollabContext>;
   /** Latest state of a collaboration document (live in-memory state when loaded). */
@@ -43,6 +53,11 @@ export interface Collab {
   broadcast(fileId: string, message: StatelessMessage): void;
   /** Disconnects every client from a file's documents (after deletion or trashing). */
   closeFile(fileId: string): void;
+  /**
+   * Applies sharing changes (and trashing) to everyone connected to these files: roles change in place, people who lost
+   * access are disconnected, and every client re-checks the files.
+   */
+  refreshAccess(fileIds: string[]): void;
   /** Handles WebSocket upgrades on `/collab`. With `exclusive`, other upgrade requests are refused. */
   attach(server: HttpServer, options: { exclusive: boolean }): void;
   destroy(): Promise<void>;
@@ -58,14 +73,9 @@ export function createCollab(db: DB, config: Config): Collab {
     async onAuthenticate({ documentName, context, connectionConfig }) {
       const parsed = parseDocName(documentName);
       const file = parsed && getFile(db, parsed.fileId);
-      const role = file && context.user ? getRole(db, context.user.id, file) : null;
-      if (!parsed || !file || !role) throw denied('forbidden');
-      if (file.trashed_at || file.type === 'workspace') {
-        // Workspace documents only carry presence and server notifications.
-        connectionConfig.readOnly = true;
-      } else {
-        connectionConfig.readOnly = parsed.kind === 'comments' ? !canComment(role) : !canEdit(role);
-      }
+      const access = parsed && file && context.user ? documentAccess(db, context.user.id, file, parsed.kind) : null;
+      if (!access) throw denied('forbidden');
+      connectionConfig.readOnly = access.readOnly;
     },
 
     async onLoadDocument({ documentName }) {
@@ -137,9 +147,25 @@ export function createCollab(db: DB, config: Config): Collab {
     },
 
     closeFile(fileId) {
-      this.broadcast(fileId, { type: 'deleted' });
+      this.broadcast(fileId, { type: 'access' });
       hocuspocus.closeConnections(fileId);
       hocuspocus.closeConnections(commentsDocName(fileId));
+    },
+
+    refreshAccess(fileIds) {
+      for (const fileId of fileIds) {
+        const file = getFile(db, fileId);
+        this.broadcast(fileId, { type: 'access' });
+        for (const kind of ['content', 'comments'] as const) {
+          const name = kind === 'content' ? fileId : commentsDocName(fileId);
+          for (const connection of hocuspocus.documents.get(name)?.getConnections() ?? []) {
+            const access = file && documentAccess(db, (connection.context as CollabContext).user.id, file, kind);
+            // Hocuspocus checks `readOnly` for every incoming update, so a new role applies without reconnecting.
+            if (access) connection.readOnly = access.readOnly;
+            else connection.close();
+          }
+        }
+      }
     },
 
     attach(server, { exclusive }) {
@@ -163,6 +189,8 @@ export function createCollab(db: DB, config: Config): Collab {
       while (hocuspocus.getDocumentsCount() > 0 && Date.now() < deadline) {
         await new Promise((resolve) => setTimeout(resolve, 50));
       }
+      // Closing the server does not close open sockets, and the HTTP server waits for them.
+      for (const client of wss.clients) client.terminate();
       wss.close();
     },
   };

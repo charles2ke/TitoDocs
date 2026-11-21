@@ -1,4 +1,4 @@
-import { HocuspocusProvider, HocuspocusProviderWebsocket } from '@hocuspocus/provider';
+import { HocuspocusProvider, HocuspocusProviderWebsocket, WebSocketStatus } from '@hocuspocus/provider';
 import { useEffect, useState } from 'react';
 import * as Y from 'yjs';
 import type { PublicUser, StatelessMessage } from '@shared/types';
@@ -20,6 +20,8 @@ export interface AwarenessUser {
 interface Entry extends Room {
   refs: number;
   releaseTimer?: ReturnType<typeof setTimeout>;
+  /** The server closed this document, or refused access to it, while the socket stayed open. */
+  dropped?: boolean;
 }
 
 let socket: HocuspocusProviderWebsocket | null = null;
@@ -44,6 +46,19 @@ export function setCollabUser(user: PublicUser | null): void {
 }
 
 /**
+ * Stops using a document the server dropped. The provider leaves without the close message that `detach` would send:
+ * the server queues messages for documents the socket has no connection to, and would replay that one against the
+ * next connection to the document, closing it at once.
+ */
+function drop(entry: Entry): void {
+  if (entry.dropped) return;
+  entry.dropped = true;
+  const { providerMap } = getSocket().configuration;
+  if (providerMap.get(entry.provider.effectiveName) === entry.provider) providerMap.delete(entry.provider.effectiveName);
+  entry.provider.detach();
+}
+
+/**
  * Joins a room, reusing the existing connection when another view already has it open
  * (e.g. the same Loop component embedded twice). Rooms are released after a short delay
  * so quick remounts do not reconnect.
@@ -53,10 +68,20 @@ export function acquireRoom(name: string): { room: Room; release: () => void } {
   if (!entry) {
     const doc = new Y.Doc();
     const provider = new HocuspocusProvider({ websocketProvider: getSocket(), name, document: doc });
+    const created: Entry = { name, doc, provider, refs: 0 };
+    // A close while the socket stays open means the server dropped just this document (access lost, file deleted).
+    provider.on('close', () => {
+      if (getSocket().status === WebSocketStatus.Connected) drop(created);
+    });
+    provider.on('authenticationFailed', () => drop(created));
     provider.attach();
     if (localUser) provider.setAwarenessField('user', localUser);
-    entry = { name, doc, provider, refs: 0 };
+    entry = created;
     rooms.set(name, entry);
+  } else if (entry.dropped) {
+    // Ask again: access may be back (e.g. the file was restored or shared again).
+    entry.dropped = false;
+    entry.provider.attach();
   }
   const current = entry;
   clearTimeout(current.releaseTimer);

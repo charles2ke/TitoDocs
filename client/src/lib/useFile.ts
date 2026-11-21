@@ -58,8 +58,7 @@ export function useLiveFile(state: FileState, room: Room | null, onTree?: () => 
   const handler = useCallback(
     (message: StatelessMessage) => {
       if (message.type === 'meta') setFile((file) => ({ ...file, ...message.file, id: file.id }));
-      // Sent when the file is trashed or deleted, or when someone's access changes: re-check.
-      else if (message.type === 'deleted') void reload();
+      else if (message.type === 'access') void reload();
       else if (message.type === 'tree') onTree?.();
     },
     [setFile, reload, onTree],

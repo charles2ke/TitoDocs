@@ -308,7 +308,9 @@ export function fileRoutes(db: DB, collab: Collab): Router {
     transaction(db, () => {
       for (const id of ids) db.prepare('UPDATE files SET trashed_at = ? WHERE id = ? AND trashed_at IS NULL').run(now, id);
     });
-    ids.forEach((id) => collab.closeFile(id));
+    // Trashed files stay open, read-only, to the owner (and a page's editors); everyone else loses access, including to a
+    // trashed workspace's pages.
+    collab.refreshAccess(file.type === 'page' ? ids : withPages(db, file));
     if (file.workspace_id) collab.broadcast(file.workspace_id, { type: 'tree' });
     res.json({ file: meta(getFile(db, file.id)!, user) });
   });
@@ -331,6 +333,7 @@ export function fileRoutes(db: DB, collab: Collab): Router {
         db.prepare('UPDATE files SET trashed_at = NULL WHERE id = ?').run(file.id);
       }
     });
+    collab.refreshAccess(file.type === 'page' ? pageSubtree(db, file.id) : withPages(db, file));
     if (file.workspace_id) collab.broadcast(file.workspace_id, { type: 'tree' });
     res.json({ file: meta(getFile(db, file.id)!, user) });
   });
@@ -339,12 +342,7 @@ export function fileRoutes(db: DB, collab: Collab): Router {
     const loaded = load(req);
     requireManage(loaded);
     const { file } = loaded;
-    const ids =
-      file.type === 'workspace'
-        ? [file.id, ...listPagesIncludingTrashed(db, file.id)]
-        : file.type === 'page'
-          ? pageSubtree(db, file.id)
-          : [file.id];
+    const ids = file.type === 'page' ? pageSubtree(db, file.id) : withPages(db, file);
     db.prepare('DELETE FROM files WHERE id = ?').run(file.id);
     ids.forEach((id) => collab.closeFile(id));
     if (file.workspace_id) collab.broadcast(file.workspace_id, { type: 'tree' });
@@ -407,6 +405,7 @@ export function fileRoutes(db: DB, collab: Collab): Router {
     const { root } = loadRoot(req, true);
     const linkAccess = requireOneOf(req.body?.linkAccess, LINK_ACCESS, 'linkAccess');
     db.prepare('UPDATE files SET link_access = ? WHERE id = ?').run(linkAccess, root.id);
+    collab.refreshAccess(withPages(db, root));
     res.json(sharingInfo(getFile(db, root.id)!));
   });
 
@@ -418,6 +417,7 @@ export function fileRoutes(db: DB, collab: Collab): Router {
     if (!target) throw notFound(`No user named "${username}".`);
     if (target.id === root.owner_id) throw badRequest('The owner already has full access.');
     upsertMember(db, root.id, target.id, role);
+    collab.refreshAccess(withPages(db, root));
     res.json(sharingInfo(root));
   });
 
@@ -428,6 +428,7 @@ export function fileRoutes(db: DB, collab: Collab): Router {
       .prepare('UPDATE file_members SET role = ? WHERE file_id = ? AND user_id = ?')
       .run(role, root.id, String(req.params.userId));
     if (!result.changes) throw notFound('That person is not a member.');
+    collab.refreshAccess(withPages(db, root));
     res.json(sharingInfo(root));
   });
 
@@ -436,7 +437,7 @@ export function fileRoutes(db: DB, collab: Collab): Router {
     const self = currentUser(req).id === targetId;
     const { root } = loadRoot(req, !self);
     db.prepare('DELETE FROM file_members WHERE file_id = ? AND user_id = ?').run(root.id, targetId);
-    collab.closeFile(root.id);
+    collab.refreshAccess(withPages(db, root));
     res.json(sharingInfo(root));
   });
 
@@ -504,3 +505,7 @@ export function fileRoutes(db: DB, collab: Collab): Router {
 
 const listPagesIncludingTrashed = (db: DB, workspaceId: string): string[] =>
   (db.prepare('SELECT id FROM files WHERE workspace_id = ?').all(workspaceId) as { id: string }[]).map((row) => row.id);
+
+/** A file and, for a workspace, everything in it (which follows the workspace's sharing settings). */
+const withPages = (db: DB, file: FileRow): string[] =>
+  file.type === 'workspace' ? [file.id, ...listPagesIncludingTrashed(db, file.id)] : [file.id];

@@ -13,7 +13,7 @@
     "build": "vite build",
     "start": "node server/index.ts --production",
     "typecheck": "tsc -p tsconfig.json && tsc -p server/tsconfig.json",
-    "test": "node --test --test-concurrency=1 \"server/test/*.test.ts\"",
+    "test": "node --test --test-concurrency=1 --test-force-exit \"server/test/*.test.ts\"",
     "test:e2e": "playwright test"
   },
   "dependencies": {
