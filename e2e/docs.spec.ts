@@ -2,23 +2,25 @@ import { readFile } from 'node:fs/promises';
 import type { Locator, Page, Route } from '@playwright/test';
 import { createFile, docEditor, expect, pickMenu, snap, test, waitForSync } from './fixtures.ts';
 
-// A 1×1 PNG image.
-const PNG = [
-  137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, 181, 28, 12, 2, 0,
-  0, 0, 11, 73, 68, 65, 84, 120, 218, 99, 100, 96, 0, 2, 0, 0, 5, 0, 1, 161, 67, 55, 39, 0, 0, 0, 0, 73, 69, 78, 68, 174,
-  66, 96, 130,
-];
-
-/** Pastes PNG images with the given names, as if copied from a file manager. */
+/** Pastes PNG images showing the given names, as if copied from a file manager. */
 async function pasteImages(editor: Locator, names: string[]): Promise<void> {
-  await editor.evaluate(
-    (element, [bytes, list]) => {
-      const clipboardData = new DataTransfer();
-      for (const name of list) clipboardData.items.add(new File([new Uint8Array(bytes)], `${name}.png`, { type: 'image/png' }));
-      element.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }));
-    },
-    [PNG, names] as const,
-  );
+  await editor.evaluate(async (element, list) => {
+    const clipboardData = new DataTransfer();
+    for (const name of list) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 160;
+      canvas.height = 48;
+      const context = canvas.getContext('2d')!;
+      context.fillStyle = '#c2e7ff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = '#001d35';
+      context.font = '20px sans-serif';
+      context.fillText(name, 16, 31);
+      const png = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+      clipboardData.items.add(new File([png!], `${name}.png`, { type: 'image/png' }));
+    }
+    element.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }));
+  }, names);
 }
 
 /** The text of each block, or `image <name>` for images. */
@@ -167,6 +169,7 @@ test('inserts several pasted images in order and keeps writing after them', asyn
     'image fourth',
     'end',
   ]);
+  await snap(page, 'doc-images-in-order');
 });
 
 test('leaves the cursor alone when someone writes elsewhere while images upload', async ({ page }) => {
