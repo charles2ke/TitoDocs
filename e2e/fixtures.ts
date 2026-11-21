@@ -5,6 +5,8 @@ export { expect };
 export const USERS = {
   maria: { username: 'maria', password: 'correct-horse-42', displayName: 'Maria Garcia' },
   victor: { username: 'victor', password: 'viewer-pass-123', displayName: 'Victor Chen' },
+  // Comes before the others in people searches, so a stale search result shows up as the wrong person.
+  alex: { username: 'alex', password: 'alphabetical-1', displayName: 'Alex Kim' },
 } as const;
 export type UserName = keyof typeof USERS;
 
