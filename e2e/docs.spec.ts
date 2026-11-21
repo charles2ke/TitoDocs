@@ -57,6 +57,59 @@ test('writes and formats a new document that is still there after a reload', asy
   expect(bytes.subarray(0, 2).toString()).toBe('PK');
 });
 
+test('keeps pasted images at their mapped insertion point during upload', async ({ page }) => {
+  const file = await createFile(page, { type: 'doc', title: 'Image anchor' });
+  await page.goto(`/d/${file.id}`);
+  await waitForSync(page);
+  const editor = docEditor(page);
+  await editor.click();
+  await page.keyboard.type('alpha omega');
+  await page.keyboard.press('Home');
+  for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowRight');
+
+  let releaseUpload!: () => void;
+  let notifyUploadStarted!: () => void;
+  const uploadStarted = new Promise<void>((resolve) => {
+    notifyUploadStarted = resolve;
+  });
+  const uploadHeld = new Promise<void>((resolve) => {
+    releaseUpload = resolve;
+  });
+  await page.route('**/api/uploads', async (route) => {
+    notifyUploadStarted();
+    await uploadHeld;
+    await route.continue();
+  });
+  await editor.evaluate((element) => {
+    const clipboardData = new DataTransfer();
+    clipboardData.items.add(
+      new File(
+        [
+          new Uint8Array([
+            137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4,
+            0, 0, 0, 181, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, 218, 99, 100, 96, 0, 2, 0, 0, 5, 0,
+            1, 161, 67, 55, 39, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
+          ]),
+        ],
+        'anchor.png',
+        { type: 'image/png' },
+      ),
+    );
+    element.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }));
+  });
+  await uploadStarted;
+  await page.keyboard.type('typed ');
+  releaseUpload();
+
+  await expect(editor.locator('img[alt="anchor"]')).toHaveCount(1);
+  expect(
+    await editor.evaluate((root) =>
+      Array.from(root.children, (child) => (child.querySelector('img') ? 'image' : child.textContent?.trim())),
+    ),
+  ).toEqual(['alpha typed', 'image', 'omega']);
+  await page.unroute('**/api/uploads');
+});
+
 test('comments on selected text, replies and resolves the thread', async ({ page }) => {
   const doc = await createFile(page, { type: 'doc', title: 'Launch checklist' });
   await page.goto(`/d/${doc.id}`);

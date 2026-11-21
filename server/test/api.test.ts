@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
+import { RateLimiter } from '../http.ts';
 import { Client, startTestServer, type TestServer } from './helpers.ts';
 
 let server: TestServer;
@@ -69,6 +70,31 @@ describe('auth', () => {
   it('blocks cross-origin writes', async () => {
     const response = await alice.request('POST', '/api/files', { type: 'doc' }, { origin: 'https://evil.example' });
     assert.equal(response.status, 403);
+  });
+
+  it('limits login attempts across usernames from one address', async () => {
+    const client = new Client(server.url);
+    let response: Awaited<ReturnType<Client['post']>> | undefined;
+    for (let attempt = 0; attempt < 40; attempt++) {
+      response = await client.post('/api/auth/login', {
+        username: `rotating-user-${attempt}`,
+        password: 'wrong password',
+      });
+      if (response.status === 429) break;
+      assert.equal(response.status, 401);
+    }
+    assert.equal(response?.status, 429);
+  });
+});
+
+describe('rate limiter', () => {
+  it('caps retained keys', () => {
+    const limiter = new RateLimiter(1, 60_000, 2);
+    assert.equal(limiter.take('first'), true);
+    assert.equal(limiter.take('first'), false);
+    assert.equal(limiter.take('second'), true);
+    assert.equal(limiter.take('third'), true);
+    assert.equal(limiter.take('first'), true);
   });
 });
 

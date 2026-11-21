@@ -5,7 +5,7 @@ import { WebSocketServer, type RawData, type WebSocket } from 'ws';
 import * as Y from 'yjs';
 import type { Config } from './config.ts';
 import { transaction, type DB } from './db.ts';
-import { isAllowedOrigin, userFromCookieHeader } from './http.ts';
+import { isAllowedOrigin, sessionFromCookieHeader } from './http.ts';
 import {
   createVersion,
   getFile,
@@ -21,6 +21,7 @@ import { canComment, canEdit, commentsDocName, type PublicUser, type StatelessMe
 
 export interface CollabContext {
   user: PublicUser;
+  sessionHash: string;
 }
 
 const AUTO_VERSION_INTERVAL_MS = 10 * 60 * 1000;
@@ -53,6 +54,8 @@ export interface Collab {
   broadcast(fileId: string, message: StatelessMessage): void;
   /** Disconnects every client from a file's documents (after deletion or trashing). */
   closeFile(fileId: string): void;
+  /** Disconnects every collaboration socket authenticated with one of these sessions. */
+  closeSessions(tokenHashes: string[]): void;
   /**
    * Applies sharing changes (and trashing) to everyone connected to these files: roles change in place, people who lost
    * access are disconnected, and every client re-checks the files.
@@ -112,15 +115,19 @@ export function createCollab(db: DB, config: Config): Collab {
   });
 
   const wss = new WebSocketServer({ noServer: true, maxPayload: 32 * 1024 * 1024 });
+  const sessionSockets = new Map<string, Set<WebSocket>>();
 
-  const handleSocket = (ws: WebSocket, req: IncomingMessage, user: PublicUser): void => {
+  const handleSocket = (ws: WebSocket, req: IncomingMessage, user: PublicUser, sessionHash: string): void => {
     const headers = new Headers();
     for (const name of ['origin', 'user-agent']) {
       const value = req.headers[name];
       if (typeof value === 'string') headers.set(name, value);
     }
     const request = new Request(new URL(req.url ?? '/', 'http://localhost'), { headers });
-    const connection = hocuspocus.handleConnection(ws as unknown as WebSocketLike, request, { user });
+    const connection = hocuspocus.handleConnection(ws as unknown as WebSocketLike, request, { user, sessionHash });
+    const sockets = sessionSockets.get(sessionHash) ?? new Set<WebSocket>();
+    sockets.add(ws);
+    sessionSockets.set(sessionHash, sockets);
     const heartbeat = setInterval(() => {
       if (ws.readyState === ws.OPEN) ws.ping();
     }, HEARTBEAT_MS);
@@ -129,6 +136,8 @@ export function createCollab(db: DB, config: Config): Collab {
     ws.on('error', (error) => console.warn('collab socket error:', error.message));
     ws.on('close', (code, reason) => {
       clearInterval(heartbeat);
+      sockets.delete(ws);
+      if (sockets.size === 0) sessionSockets.delete(sessionHash);
       connection.handleClose({ code, reason: reason.toString() });
     });
   };
@@ -150,6 +159,12 @@ export function createCollab(db: DB, config: Config): Collab {
       this.broadcast(fileId, { type: 'access' });
       hocuspocus.closeConnections(fileId);
       hocuspocus.closeConnections(commentsDocName(fileId));
+    },
+
+    closeSessions(tokenHashes) {
+      for (const tokenHash of tokenHashes) {
+        for (const socket of sessionSockets.get(tokenHash) ?? []) socket.terminate();
+      }
     },
 
     refreshAccess(fileIds) {
@@ -176,9 +191,11 @@ export function createCollab(db: DB, config: Config): Collab {
           return;
         }
         if (!isAllowedOrigin(req.headers, config)) return rejectUpgrade(socket, 403, 'Forbidden');
-        const user = userFromCookieHeader(db, req.headers.cookie);
-        if (!user) return rejectUpgrade(socket, 401, 'Unauthorized');
-        wss.handleUpgrade(req, socket, head, (ws) => handleSocket(ws, req, toPublicUser(user)));
+        const session = sessionFromCookieHeader(db, req.headers.cookie);
+        if (!session) return rejectUpgrade(socket, 401, 'Unauthorized');
+        wss.handleUpgrade(req, socket, head, (ws) =>
+          handleSocket(ws, req, toPublicUser(session.user), session.tokenHash),
+        );
       });
     },
 

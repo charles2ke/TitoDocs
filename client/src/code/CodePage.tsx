@@ -572,7 +572,7 @@ function CodeEditor({ state, file, tabs, onCloseTab, room }: CodeRoomProps & { r
 
   const closeCompare = () => {
     setCompare(null);
-    focusEditor();
+    requestAnimationFrame(focusEditor);
   };
 
   const closeResults = () => {

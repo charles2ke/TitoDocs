@@ -43,13 +43,22 @@ export function parseCookies(header: string | undefined): Record<string, string>
 }
 
 export function userFromCookieHeader(db: DB, cookieHeader: string | undefined): UserRow | undefined {
+  return sessionFromCookieHeader(db, cookieHeader)?.user;
+}
+
+export function sessionFromCookieHeader(
+  db: DB,
+  cookieHeader: string | undefined,
+): { user: UserRow; tokenHash: string } | undefined {
   const token = parseCookies(cookieHeader)[SESSION_COOKIE];
   if (!token) return undefined;
+  const tokenHash = hashToken(token);
   const session = db
     .prepare('SELECT user_id, expires_at FROM sessions WHERE token_hash = ?')
-    .get(hashToken(token)) as { user_id: string; expires_at: number } | undefined;
+    .get(tokenHash) as { user_id: string; expires_at: number } | undefined;
   if (!session || session.expires_at < Date.now()) return undefined;
-  return getUserById(db, session.user_id);
+  const user = getUserById(db, session.user_id);
+  return user ? { user, tokenHash } : undefined;
 }
 
 export function startSession(db: DB, config: Config, res: Response, userId: string): void {
@@ -72,9 +81,19 @@ export function startSession(db: DB, config: Config, res: Response, userId: stri
   });
 }
 
-export function endSession(db: DB, config: Config, req: Request, res: Response): void {
+export function endSession(
+  db: DB,
+  config: Config,
+  req: Request,
+  res: Response,
+  onRevoke?: (tokenHash: string) => void,
+): void {
   const token = parseCookies(req.headers.cookie)[SESSION_COOKIE];
-  if (token) db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(hashToken(token));
+  if (token) {
+    const tokenHash = hashToken(token);
+    db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(tokenHash);
+    onRevoke?.(tokenHash);
+  }
   res.clearCookie(SESSION_COOKIE, { httpOnly: true, sameSite: 'lax', secure: config.secureCookies, path: '/' });
 }
 
@@ -125,22 +144,31 @@ export const originGuard =
 /** Simple fixed-window limiter keyed by an arbitrary string (used for login attempts). */
 export class RateLimiter {
   private hits = new Map<string, { count: number; resetAt: number }>();
+  private calls = 0;
   private limit: number;
   private windowMs: number;
+  private maxEntries: number;
+  private cleanupEvery: number;
 
-  constructor(limit: number, windowMs: number) {
+  constructor(limit: number, windowMs: number, maxEntries = 10_000, cleanupEvery = 256) {
     this.limit = limit;
     this.windowMs = windowMs;
+    this.maxEntries = maxEntries;
+    this.cleanupEvery = cleanupEvery;
   }
 
   /** Returns false once `key` has exceeded the limit within the current window. */
   take(key: string): boolean {
     const now = Date.now();
-    if (this.hits.size > 10_000) {
+    if (++this.calls % this.cleanupEvery === 0) {
       for (const [k, v] of this.hits) if (v.resetAt < now) this.hits.delete(k);
     }
     const entry = this.hits.get(key);
     if (!entry || entry.resetAt < now) {
+      if (!entry && this.hits.size >= this.maxEntries) {
+        const oldest = this.hits.keys().next().value;
+        if (oldest !== undefined) this.hits.delete(oldest);
+      }
       this.hits.set(key, { count: 1, resetAt: now + this.windowMs });
       return true;
     }

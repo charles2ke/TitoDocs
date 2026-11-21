@@ -17,6 +17,7 @@ interface CompareViewProps {
 }
 
 export function CompareView({ current, other, language, file, dark, onClose }: CompareViewProps) {
+  const dialog = useRef<HTMLDialogElement>(null);
   const host = useRef<HTMLDivElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
   const [swapped, setSwapped] = useState(false);
@@ -37,18 +38,16 @@ export function CompareView({ current, other, language, file, dark, onClose }: C
     return () => view.destroy();
   }, [left, right, language, file, dark]);
 
-  useEffect(() => closeButton.current?.focus(), []);
-
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !event.defaultPrevented && !document.querySelector('dialog[open]')) {
-        event.preventDefault();
-        onClose();
-      }
+    const element = dialog.current;
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    element?.showModal();
+    closeButton.current?.focus();
+    return () => {
+      if (element?.open) element.close();
+      if (previouslyFocused?.isConnected) previouslyFocused.focus();
     };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
 
   const differences = merge?.chunks.length ?? 0;
   const step = (forward: boolean) => {
@@ -57,7 +56,31 @@ export function CompareView({ current, other, language, file, dark, onClose }: C
   };
 
   return (
-    <div className="compare-view" role="dialog" aria-modal="true" aria-label="Compare" data-testid="compare-view">
+    <dialog
+      ref={dialog}
+      className="compare-view"
+      aria-label="Compare"
+      data-testid="compare-view"
+      onKeyDown={(event) => {
+        if (event.key !== 'Tab') return;
+        const focusable = Array.from(
+          event.currentTarget.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), [contenteditable="true"]',
+          ),
+        ).filter((element) => element.getClientRects().length > 0);
+        const index = focusable.indexOf(document.activeElement as HTMLElement);
+        const next = event.shiftKey ? index <= 0 : index === -1 || index === focusable.length - 1;
+        if (next && focusable.length) {
+          event.preventDefault();
+          event.stopPropagation();
+          focusable[event.shiftKey ? focusable.length - 1 : 0].focus();
+        }
+      }}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+    >
       <header className="compare-toolbar">
         <strong>Compare</strong>
         <span className="muted" data-testid="compare-summary">
@@ -86,6 +109,6 @@ export function CompareView({ current, other, language, file, dark, onClose }: C
         </span>
       </div>
       <div className="compare-host" ref={host} aria-label={`${left.label} compared with ${right.label}`} />
-    </div>
+    </dialog>
   );
 }

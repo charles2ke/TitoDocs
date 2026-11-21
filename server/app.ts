@@ -52,7 +52,7 @@ export function createApp({ db, config, collab, frontend }: AppOptions): Express
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true });
   });
-  app.use('/api/auth', authRoutes(db, config));
+  app.use('/api/auth', authRoutes(db, config, collab));
   app.use('/api/files', fileRoutes(db, collab));
   app.use('/api/users', userRoutes(db));
   app.use('/api', (_req, _res, next) => next(notFound()));

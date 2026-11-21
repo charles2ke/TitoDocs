@@ -208,6 +208,52 @@ describe('collaboration', () => {
     member.destroy();
   });
 
+  it('disconnects the session socket on logout', async () => {
+    const file = await newFile('code');
+    const logoutDevice = new Client(server.url);
+    await logoutDevice.post('/api/auth/login', { username: 'alice', password: 'correct horse battery' });
+    const ownerConnection = connect(server, alice, file.id);
+    const revokedConnection = connect(server, logoutDevice, file.id);
+    await Promise.all([ownerConnection.synced, revokedConnection.synced]);
+    assert.equal(server.collab.hocuspocus.documents.get(file.id)?.getConnections().length, 2);
+
+    await logoutDevice.post('/api/auth/logout');
+    await waitFor(() => server.collab.hocuspocus.documents.get(file.id)?.getConnections().length === 1);
+    revokedConnection.document.getText(CODE_FIELD).insert(0, 'revoked');
+    ownerConnection.document.getText(CODE_FIELD).insert(0, 'active');
+    await waitFor(() => serverText(file.id) === 'active');
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(revokedConnection.document.getText(CODE_FIELD).toString(), 'revoked');
+
+    ownerConnection.destroy();
+    revokedConnection.destroy();
+  });
+
+  it('disconnects other-session sockets when the password changes', async () => {
+    const file = await newFile('code');
+    const otherDevice = new Client(server.url);
+    await otherDevice.post('/api/auth/login', { username: 'alice', password: 'correct horse battery' });
+    const ownerConnection = connect(server, alice, file.id);
+    const revokedConnection = connect(server, otherDevice, file.id);
+    await Promise.all([ownerConnection.synced, revokedConnection.synced]);
+    assert.equal(server.collab.hocuspocus.documents.get(file.id)?.getConnections().length, 2);
+
+    const changed = await alice.post('/api/auth/password', {
+      currentPassword: 'correct horse battery',
+      newPassword: 'even better horse',
+    });
+    assert.equal(changed.status, 200);
+    await waitFor(() => server.collab.hocuspocus.documents.get(file.id)?.getConnections().length === 1);
+    revokedConnection.document.getText(CODE_FIELD).insert(0, 'revoked');
+    ownerConnection.document.getText(CODE_FIELD).insert(0, 'active');
+    await waitFor(() => serverText(file.id) === 'active');
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(revokedConnection.document.getText(CODE_FIELD).toString(), 'revoked');
+
+    ownerConnection.destroy();
+    revokedConnection.destroy();
+  });
+
   it('keeps trashed files open read-only to the owner only, until restored', async () => {
     const file = await newFile('code');
     await alice.post(`/api/files/${file.id}/members`, { username: 'bob', role: 'editor' });

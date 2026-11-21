@@ -1,4 +1,4 @@
-import type { AnyExtension, Editor } from '@tiptap/core';
+import { Extension, type AnyExtension, type Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { TextStyleKit } from '@tiptap/extension-text-style';
 import Highlight from '@tiptap/extension-highlight';
@@ -16,6 +16,7 @@ import InvisibleCharacters from '@tiptap/extension-invisible-characters';
 import Collaboration from '@tiptap/extension-collaboration';
 import CollaborationCaret from '@tiptap/extension-collaboration-caret';
 import FileHandler from '@tiptap/extension-file-handler';
+import { Plugin, PluginKey, Selection as ProseMirrorSelection } from '@tiptap/pm/state';
 import { common, createLowlight } from 'lowlight';
 import { RICH_FIELD } from '@shared/types';
 import { api } from '../api';
@@ -33,6 +34,37 @@ export const lowlight = createLowlight(common);
 
 export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 
+type ImageAnchor = { from: number; to: number };
+type ImageAnchorMeta = { add?: { id: string; anchor: ImageAnchor }; remove?: string[]; set?: { id: string; anchor: ImageAnchor } };
+
+const imageAnchorsKey = new PluginKey<Map<string, ImageAnchor>>('imageUploadAnchors');
+const imageAnchorsPlugin = new Plugin({
+  key: imageAnchorsKey,
+  state: {
+    init: () => new Map<string, ImageAnchor>(),
+    apply(transaction, previous) {
+      const anchors = new Map(
+        [...previous].map(([id, anchor]) => [
+          id,
+          {
+            from: transaction.mapping.map(anchor.from, 1),
+            to: transaction.mapping.map(anchor.to, 1),
+          },
+        ]),
+      );
+      const meta = transaction.getMeta(imageAnchorsKey) as ImageAnchorMeta | undefined;
+      for (const id of meta?.remove ?? []) anchors.delete(id);
+      if (meta?.add) anchors.set(meta.add.id, meta.add.anchor);
+      if (meta?.set) anchors.set(meta.set.id, meta.set.anchor);
+      return anchors;
+    },
+  },
+});
+const ImageUploadAnchors = Extension.create({
+  name: 'imageUploadAnchors',
+  addProseMirrorPlugins: () => [imageAnchorsPlugin],
+});
+
 export interface EditorSetup {
   room: Room;
   user: AwarenessUser;
@@ -46,16 +78,39 @@ export interface EditorSetup {
   extra?: AnyExtension[];
 }
 
-/** Uploads pasted or dropped images and inserts them at `pos`. */
+/** Uploads pasted or dropped images and inserts them at their mapped document position. */
 export async function insertImages(editor: Editor, files: File[], pos: number | null, onError?: (error: unknown) => void) {
-  for (const file of files) {
-    try {
-      const src = await api.upload(file);
-      const image = { type: 'image', attrs: { src, alt: file.name.replace(/\.[^.]+$/, '') } };
-      if (pos === null) editor.chain().focus().insertContent(image).run();
-      else editor.chain().insertContentAt(pos, image).focus().run();
-    } catch (error) {
-      onError?.(error);
+  const id = crypto.randomUUID();
+  const selection = editor.state.selection;
+  const from = pos ?? selection.from;
+  const to = pos === null ? selection.to : pos;
+  editor.view.dispatch(editor.state.tr.setMeta(imageAnchorsKey, { add: { id, anchor: { from, to } } }));
+  try {
+    for (const file of files) {
+      try {
+        const src = await api.upload(file);
+        if (editor.isDestroyed) break;
+        const anchor = imageAnchorsKey.getState(editor.state)?.get(id);
+        if (!anchor) break;
+        const image = editor.schema.nodes.image.create({
+          src,
+          alt: file.name.replace(/\.[^.]+$/, ''),
+        });
+        const nextPosition = anchor.from + image.nodeSize;
+        const transaction = editor.state.tr.replaceRangeWith(anchor.from, anchor.to, image);
+        transaction.setSelection(ProseMirrorSelection.near(transaction.doc.resolve(nextPosition), 1));
+        editor.view.dispatch(transaction);
+        editor.view.focus();
+        editor.view.dispatch(
+          editor.state.tr.setMeta(imageAnchorsKey, { set: { id, anchor: { from: nextPosition, to: nextPosition } } }),
+        );
+      } catch (error) {
+        onError?.(error);
+      }
+    }
+  } finally {
+    if (!editor.isDestroyed) {
+      editor.view.dispatch(editor.state.tr.setMeta(imageAnchorsKey, { remove: [id] }));
     }
   }
 }
@@ -116,6 +171,7 @@ export function contentExtensions(extra: AnyExtension[] = []): AnyExtension[] {
 export function buildExtensions(setup: EditorSetup): AnyExtension[] {
   return [
     ...contentExtensions(setup.extra),
+    ImageUploadAnchors,
     CharacterCount,
     Placeholder.configure({ placeholder: setup.placeholder, includeChildren: false }),
     Selection,

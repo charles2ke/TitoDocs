@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FileDetails, FileMeta, StatelessMessage } from '@shared/types';
 import { ApiError, api } from '../api';
 import { useStateless, type Room } from '../collab';
@@ -18,19 +18,24 @@ export function useFile(id: string): FileState {
   const [details, setDetails] = useState<FileDetails | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [deleted, setDeleted] = useState(false);
+  const requestGeneration = useRef(0);
 
   const reload = useCallback(async () => {
+    const generation = ++requestGeneration.current;
     try {
       const next = await api.getFile(id);
+      if (generation !== requestGeneration.current) return;
       setDetails(next);
       setError(null);
       setDeleted(!!next.file.trashedAt);
     } catch (caught) {
+      if (generation !== requestGeneration.current) return;
       setError(caught instanceof ApiError ? caught : new ApiError(0, String(caught)));
     }
   }, [id]);
 
   useEffect(() => {
+    requestGeneration.current++;
     setDetails(null);
     setError(null);
     setDeleted(false);

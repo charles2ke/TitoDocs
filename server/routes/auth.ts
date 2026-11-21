@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type { Config } from '../config.ts';
+import type { Collab } from '../collab.ts';
 import type { DB } from '../db.ts';
 import {
   HttpError,
@@ -20,9 +21,10 @@ import { parseCookies, SESSION_COOKIE } from '../http.ts';
 const USERNAME_PATTERN = /^[a-zA-Z0-9_.-]+$/;
 const COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 
-export function authRoutes(db: DB, config: Config): Router {
+export function authRoutes(db: DB, config: Config, collab: Collab): Router {
   const router = Router();
   const loginLimiter = new RateLimiter(10, 15 * 60 * 1000);
+  const loginAddressLimiter = new RateLimiter(30, 15 * 60 * 1000);
   const registerLimiter = new RateLimiter(20, 60 * 60 * 1000);
 
   router.get('/config', (_req, res) => {
@@ -59,7 +61,12 @@ export function authRoutes(db: DB, config: Config): Router {
     const username = requireString(req.body?.username, 'Username', { max: 64 });
     const password = requireString(req.body?.password, 'Password', { max: 200, trim: false });
     const key = `${req.ip}|${username.toLowerCase()}`;
-    if (!loginLimiter.take(key)) throw new HttpError(429, 'Too many sign-in attempts. Try again in a few minutes.');
+    if (
+      !loginAddressLimiter.take(req.ip ?? 'unknown') ||
+      !loginLimiter.take(key)
+    ) {
+      throw new HttpError(429, 'Too many sign-in attempts. Try again in a few minutes.');
+    }
     const user = getUserByUsername(db, username);
     // Hash anyway for unknown users so response timing does not reveal which usernames exist.
     const valid = user ? await verifyPassword(password, user.password_hash) : (await hashPassword(password), false);
@@ -74,7 +81,7 @@ export function authRoutes(db: DB, config: Config): Router {
   });
 
   router.post('/logout', (req, res) => {
-    endSession(db, config, req, res);
+    endSession(db, config, req, res, (tokenHash) => collab.closeSessions([tokenHash]));
     res.json({ ok: true });
   });
 
@@ -101,7 +108,12 @@ export function authRoutes(db: DB, config: Config): Router {
     db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(await hashPassword(next), user.id);
     // Sign out every other session.
     const token = parseCookies(req.headers.cookie)[SESSION_COOKIE];
-    db.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?').run(user.id, token ? hashToken(token) : '');
+    const tokenHash = token ? hashToken(token) : '';
+    const revoked = db
+      .prepare('SELECT token_hash FROM sessions WHERE user_id = ? AND token_hash != ?')
+      .all(user.id, tokenHash) as { token_hash: string }[];
+    db.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?').run(user.id, tokenHash);
+    collab.closeSessions(revoked.map((session) => session.token_hash));
     res.json({ ok: true });
   });
 

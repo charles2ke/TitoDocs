@@ -66,3 +66,61 @@ test('edits text with Notepad++ style line tools, search and tabs', async ({ pag
   await expect(editorLines(page)).toHaveText(['APPLE', 'FIG', 'PLUM']);
   await expect(tabs.getByRole('link')).toHaveCount(2);
 });
+
+test('keeps keyboard focus in Compare and restores it when closed', async ({ page }) => {
+  await newCodeFile(page, 'Text file');
+  await pickMenu(page, ['Tools', 'Compare…']);
+  await page.getByRole('radio', { name: 'Pasted text' }).check();
+  await page.getByTestId('compare-paste').fill('other text');
+  await page.getByRole('button', { name: 'Compare', exact: true }).click();
+
+  const compare = page.getByTestId('compare-view');
+  await expect(compare).toBeVisible();
+  await page.getByTestId('code-editor').locator('.cm-content').evaluate((element) => (element as HTMLElement).focus());
+  expect(await compare.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+  for (let i = 0; i < 8; i++) {
+    await page.keyboard.press('Tab');
+    expect(await compare.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+  }
+  await snap(page, 'code-compare');
+  await compare.getByRole('button', { name: 'Close compare' }).click();
+  await expect(compare).toHaveCount(0);
+  await expect(page.getByTestId('code-editor').locator('.cm-content')).toBeFocused();
+});
+
+test('ignores stale file metadata when switching tabs quickly', async ({ page }) => {
+  await newCodeFile(page, 'Text file');
+  const tabs = page.getByTestId('code-tabs');
+  const filename = page.getByRole('textbox', { name: 'File name' });
+  await filename.fill('first.txt');
+  await filename.press('Enter');
+  const firstId = new URL(page.url()).pathname.split('/').pop()!;
+
+  await page.getByTestId('code-new-tab').click();
+  await expect(page).toHaveURL(/\/code\/[\w-]+$/);
+  const secondId = new URL(page.url()).pathname.split('/').pop()!;
+  await waitForSync(page);
+
+  let releaseResponse!: () => void;
+  let notifyResponseStarted!: () => void;
+  const responseStarted = new Promise<void>((resolve) => {
+    notifyResponseStarted = resolve;
+  });
+  const responseHeld = new Promise<void>((resolve) => {
+    releaseResponse = resolve;
+  });
+  await page.route((url) => url.pathname === `/api/files/${firstId}`, async (route) => {
+    notifyResponseStarted();
+    await responseHeld;
+    await route.continue();
+  });
+  await tabs.getByRole('link', { name: 'first.txt' }).click();
+  await responseStarted;
+  await page.goBack();
+  await waitForSync(page);
+  releaseResponse();
+
+  await expect(filename).toHaveValue('untitled.txt');
+  await waitForSync(page);
+  await page.unroute((url) => url.pathname === `/api/files/${firstId}`);
+});

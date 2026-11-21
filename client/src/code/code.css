@@ -340,7 +340,19 @@ button.status-recording:hover {
   z-index: 200;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
   background: var(--bg);
+  color: var(--text);
+}
+
+.compare-view::backdrop {
+  background: transparent;
 }
 
 .compare-toolbar {
