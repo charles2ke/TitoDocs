@@ -64,9 +64,13 @@ export function authRoutes(db: DB, config: Config): Router {
     // Hash anyway for unknown users so response timing does not reveal which usernames exist.
     const valid = user ? await verifyPassword(password, user.password_hash) : (await hashPassword(password), false);
     if (!user || !valid) throw new HttpError(401, 'Incorrect username or password.');
+    const latestUser = getUserById(db, user.id);
+    if (!latestUser || latestUser.password_hash !== user.password_hash) {
+      throw new HttpError(401, 'Incorrect username or password.');
+    }
     loginLimiter.reset(key);
-    startSession(db, config, res, user.id);
-    res.json({ user: toPublicUser(user) });
+    startSession(db, config, res, latestUser.id);
+    res.json({ user: toPublicUser(latestUser) });
   });
 
   router.post('/logout', (req, res) => {

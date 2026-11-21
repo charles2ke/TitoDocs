@@ -56,6 +56,14 @@ describe('auth', () => {
     assert.equal(changed.status, 200, JSON.stringify(changed.data));
     assert.equal((await otherDevice.get('/api/auth/me')).data.user, null);
     assert.equal((await erin.get('/api/auth/me')).data.user.username, 'erin');
+    assert.equal(
+      (await otherDevice.post('/api/auth/login', { username: 'erin', password: 'correct horse battery' })).status,
+      401,
+    );
+    assert.equal(
+      (await otherDevice.post('/api/auth/login', { username: 'erin', password: 'even better horse' })).status,
+      200,
+    );
   });
 
   it('blocks cross-origin writes', async () => {
