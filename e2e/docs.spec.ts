@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { createFile, docEditor, expect, pickMenu, snap, test, waitForSync } from './fixtures.ts';
+import { createFile, docEditor, expect, pickMenu, readPdf, showPdfPage, snap, test, waitForSync } from './fixtures.ts';
 
 test('writes and formats a new document that is still there after a reload', async ({ page }) => {
   await page.goto('/');
@@ -55,6 +55,92 @@ test('writes and formats a new document that is still there after a reload', asy
   expect(docx.suggestedFilename()).toBe('Quarterly report.docx');
   const bytes = await readFile(await docx.path());
   expect(bytes.subarray(0, 2).toString()).toBe('PK');
+});
+
+test('downloads a PDF with the formatting, links and bookmarks of the document', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text());
+  });
+  page.on('pageerror', (error) => errors.push(error.message));
+  const file = await createFile(page, { type: 'doc', title: 'Launch plan' });
+  await page.goto(`/d/${file.id}`);
+  await waitForSync(page);
+  const editor = docEditor(page);
+  await editor.click();
+  await editor.evaluate((element, html) => {
+    const clipboardData = new DataTransfer();
+    clipboardData.setData('text/html', html);
+    element.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }));
+  }, `<h1>Launch plan</h1>
+    <p>We ship on <strong>June 3</strong>. Read the <a href="https://example.com/brief">brief</a> first.</p>
+    <div data-type="table-of-contents"></div>
+    <h2>Timeline</h2>
+    <ol><li><p>Freeze features</p></li><li><p>Finish the beta ✓</p></li><li><p>Launch 🎉</p></li></ol>
+    <h2>Budget</h2>
+    <table><tbody>
+      <tr><th><p>Item</p></th><th><p>Cost</p></th></tr>
+      <tr><td><p>Ads</p></td><td><p>$4,000</p></td></tr>
+      <tr><td><p>Events</p></td><td><p>$2,500</p></td></tr>
+    </tbody></table>
+    <pre><code class="language-js">const launch = new Date('2025-06-03');</code></pre>`);
+  await expect(editor.locator('table')).toBeVisible();
+  await expect(editor.locator('h2')).toHaveText(['Timeline', 'Budget']);
+
+  const download = page.waitForEvent('download');
+  await pickMenu(page, ['File', 'Download', 'PDF document (.pdf)']);
+  const pdf = await download;
+  expect(pdf.suggestedFilename()).toBe('Launch plan.pdf');
+  const bytes = await readFile(await pdf.path());
+  expect(bytes.subarray(0, 5).toString()).toBe('%PDF-');
+  const content = await readPdf(bytes);
+  // A Letter page, the default page setup.
+  expect(content.size).toEqual([612, 792]);
+  expect(content.title).toBe('Launch plan');
+  expect(content.pages).toEqual([
+    [
+      'Launch plan',
+      'We ship on June 3. Read the brief first.',
+      'Table of contents',
+      'Launch plan 1',
+      'Timeline 1',
+      'Budget 1',
+      'Timeline',
+      '1. Freeze features',
+      '2. Finish the beta ✓',
+      '3. Launch 🎉',
+      'Budget',
+      'Item Cost',
+      'Ads $4,000',
+      'Events $2,500',
+      "const launch = new Date('2025-06-03');",
+    ],
+  ]);
+  expect(content.links).toEqual(['https://example.com/brief']);
+  expect(content.outline).toEqual([
+    {
+      title: 'Launch plan',
+      items: [
+        { title: 'Timeline', items: [] },
+        { title: 'Budget', items: [] },
+      ],
+    },
+  ]);
+  const viewer = await showPdfPage(page.context(), bytes);
+  await snap(viewer, 'doc-pdf');
+  await viewer.close();
+
+  // Characters that the PDF's fonts don't have can't be shown, so the download says so and suggests printing instead.
+  await editor.locator('p').first().click();
+  await page.keyboard.press('End');
+  await page.keyboard.type(' 東京');
+  const again = page.waitForEvent('download');
+  await pickMenu(page, ['File', 'Download', 'PDF document (.pdf)']);
+  await again;
+  const warning = page.getByRole('status').filter({ hasText: 'can’t be shown in the PDF' });
+  await expect(warning).toContainText('Some characters (東 京) can’t be shown in the PDF.');
+  await expect(warning.getByRole('button', { name: 'Print' })).toBeVisible();
+  expect(errors).toEqual([]);
 });
 
 test('keeps pasted images at their mapped insertion point during upload', async ({ page }) => {

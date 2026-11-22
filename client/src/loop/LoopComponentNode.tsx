@@ -39,6 +39,15 @@ export function componentIdFromLink(text: string): string | null {
 
 const componentUrl = (id: unknown): string => absoluteUrl(`/c/${String(id)}`);
 
+/** The link that stands in for a component outside the editor (in downloads), as its live content isn't in the page. */
+export function componentLink(attrs: Record<string, unknown> | undefined): { href: string; label: string } {
+  const type = attrs?.type as ComponentType | null | undefined;
+  return {
+    href: componentUrl(attrs?.id),
+    label: type ? `${componentInfo(type).label} (Loop component)` : 'Loop component',
+  };
+}
+
 function closestInNode(start: Element, selector: string): Element | null {
   for (let element: Element | null = start; element && !element.classList.contains(NODE_CLASS); element = element.parentElement) {
     if (element.matches(selector)) return element;
@@ -136,8 +145,8 @@ export const LoopComponent = Node.create<LoopComponentOptions>({
   },
 
   renderHTML({ node, HTMLAttributes }) {
-    const label = node.attrs.type ? `${componentInfo(node.attrs.type).label} (Loop component)` : 'Loop component';
-    return ['div', mergeAttributes(HTMLAttributes, { 'data-loop-component': '', class: 'loop-embed-link' }), ['a', { href: componentUrl(node.attrs.id) }, label]];
+    const { href, label } = componentLink(node.attrs);
+    return ['div', mergeAttributes(HTMLAttributes, { 'data-loop-component': '', class: 'loop-embed-link' }), ['a', { href }, label]];
   },
 
   renderText({ node }) {

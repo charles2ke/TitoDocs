@@ -19,7 +19,7 @@ Everyone who opens a file edits the same copy, sees the others' cursors, and cha
 - **Version history:** name versions and restore earlier ones.
 - **Find and replace**, outline, word count, zoom, full screen, a viewing mode, non-printing characters, spell check (the browser's), page setup (paper size, orientation and margins) and printing.
 - **Import** Word (.docx), Markdown, HTML and text files.
-- **Download** as .docx, .html, .md or .txt, or as PDF through the browser's print dialog.
+- **Download** as PDF, .docx, .html, .md or .txt. The PDF is made in the browser, with the document's formatting and page setup, bookmarks for its headings and page numbers in its table of contents.
 - **Templates:** letter, meeting notes, project proposal and résumé.
 
 ### Code and text files
@@ -54,7 +54,7 @@ Everyone who opens a file edits the same copy, sees the others' cursors, and cha
   - Add and rename pages.
   - Reorder pages by dragging them, or with Move up and Move down.
   - Move pages to "Recently deleted" and restore them.
-- **Pages** are rich text, with the same `/` menu and `@` mentions as documents, and a drag handle for moving blocks.
+- **Pages** are rich text, with the same `/` menu and `@` mentions as documents, and a drag handle for moving blocks. They can be downloaded as PDF, .md, .html or .txt.
 - **Live components:** task list (with assignees and due dates), progress tracker, voting table, Q&A and paragraph.
   - Insert them from the `/` menu or the Insert menu.
   - Each component has its own link, so people can open just the component. Their changes show up live on the page.
@@ -153,7 +153,9 @@ On every pull request, CI:
 - There's no suggesting mode (tracked changes).
 - There's no automatic pagination: page breaks are manual.
 - Comment rules are enforced by the app, not the server. The app only lets you edit your own comments, and delete your own (or anyone's, if you moderate). Someone who may comment could still change other people's comments with a modified client.
-- The .docx export hasn't been tested in Microsoft Word.
+- The .docx export hasn't been tested in Microsoft Word, and the PDF download has only been checked with pdf.js.
+- The PDF download draws every font as Arimo, Tinos or Cousine (which have the widths of Arial, Times New Roman and Courier New), so other fonts look different. Images from other sites become links.
+- The PDF download can't show characters that its fonts lack, such as Chinese, Japanese and Korean, and right-to-left text may come out in the wrong order. It warns about both and suggests printing to PDF instead.
 
 **Workspaces**
 - Anyone signed in who has a component's link can open and edit it.
