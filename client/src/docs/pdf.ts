@@ -96,6 +96,7 @@ interface Block {
   sBottom: number;
   left?: number;
   pageBreak?: boolean;
+  breakAfter?: boolean;
   /**
    * The most the node can take up, for blocks that pdfmake doesn't break across pages (images, rules and code blocks
    * that fit on a page) and for headings, which `keepWithNext` keeps on the same page as such a block after them.
@@ -596,6 +597,13 @@ const QUOTE_LAYOUT: PdfNode = {
  */
 function join(blocks: Block[], mode: 'root' | 'collapse' | 'box'): PdfNode[] {
   const list = [...blocks];
+  if (mode === 'root') {
+    list.forEach((block, index) => {
+      if (block.breakAfter && list.slice(index + 1).some((next) => !next.pageBreak)) {
+        block.node.pageBreak = 'after';
+      }
+    });
+  }
   if (mode === 'root') while (list[list.length - 1]?.pageBreak) list.pop();
   const tops = list.map(() => 0);
   const bottoms = list.map(() => 0);
@@ -626,20 +634,39 @@ function join(blocks: Block[], mode: 'root' | 'collapse' | 'box'): PdfNode[] {
 
 /** A container without padding or borders (a list or list item), whose children's margins collapse through it. */
 function collapse(children: Block[], node: (content: PdfNode[]) => PdfNode, own = { top: 0, bottom: 0 }): Block {
-  const first = children[0];
-  const last = children[children.length - 1];
+  const nested = takeBreaks(children);
+  const first = nested.blocks[0];
+  const last = nested.blocks[nested.blocks.length - 1];
   return {
-    node: node(join(children, 'collapse')),
+    node: node(join(nested.blocks, 'collapse')),
     top: Math.max(own.top, first?.top ?? 0),
     bottom: Math.max(own.bottom, last?.bottom ?? 0),
     innerBottom: last?.bottom ?? 0,
     sTop: first?.sTop ?? 0,
     sBottom: last?.sBottom ?? 0,
+    breakAfter: nested.breakAfter,
   };
 }
 
 /** Space inside a box, which doesn't collapse with the margins of its content. */
 const box = (node: PdfNode, bottom: number): Block => ({ node, top: 0, bottom, sTop: 0, sBottom: 0 });
+
+function breakBlock(): Block {
+  return { node: { canvas: [], pageBreak: 'after' }, top: 0, bottom: 0, sTop: 0, sBottom: 0, pageBreak: true };
+}
+
+function takeBreaks(blocks: Block[]): { blocks: Block[]; breakAfter: boolean } {
+  let breakAfter = false;
+  const content = blocks.filter((block) => {
+    if (block.pageBreak) {
+      breakAfter = true;
+      return false;
+    }
+    if (block.breakAfter) breakAfter = true;
+    return true;
+  });
+  return { blocks: content, breakAfter };
+}
 
 /**
  * Keeps headings on the same page as an image, rule or code block right after them, by making them one unbreakable
@@ -778,8 +805,7 @@ class Converter {
         ];
       }
       case 'pageBreak':
-        if (ctx.inTable) return [];
-        return [{ node: { canvas: [], pageBreak: 'after' }, top: 0, bottom: 0, sTop: 0, sBottom: 0, pageBreak: true }];
+        return [breakBlock()];
       case 'image':
         return [this.image(node, ctx)];
       case 'table':
@@ -1038,16 +1064,19 @@ class Converter {
         bullets: ctx.bullets + 1,
       });
       // Each item is a flex box, which keeps its content's margins inside.
-      return box(
+      const nested = takeBreaks(this.blocks(item.content, inner));
+      const block = box(
         {
           columns: [
             { width: CHECKBOX, canvas: checkbox(checked) },
-            { width: '*', stack: join(this.blocks(item.content, inner), 'box') },
+            { width: '*', stack: join(nested.blocks, 'box') },
           ],
           columnGap: gap,
         },
         0,
       );
+      block.breakAfter = nested.breakAfter;
+      return block;
     });
     const nested = ctx.inTaskList || ctx.inListItem;
     const block = collapse(items, (stack) => ({ stack }), { top: 0, bottom: nested ? 0 : LIST_AFTER });
@@ -1061,8 +1090,11 @@ class Converter {
       width: ctx.width - 3 * PX - BASE_SIZE,
       inTable: true,
     });
-    const body = [[{ stack: join(this.blocks(node.content, inner), 'box') }]];
-    return box({ table: { widths: ['*'], body }, layout: QUOTE_LAYOUT }, LIST_AFTER);
+    const nested = takeBreaks(this.blocks(node.content, inner));
+    const body = [[{ stack: join(nested.blocks, 'box') }]];
+    const block = box({ table: { widths: ['*'], body }, layout: QUOTE_LAYOUT }, LIST_AFTER);
+    block.breakAfter = nested.breakAfter;
+    return block;
   }
 
   private codeBlock(node: JSONContent, ctx: Ctx): Block {
@@ -1198,6 +1230,7 @@ class Converter {
     const inner = widths.map((width) => Math.max(1, width - CELL_X - LINE / columnCount));
 
     const body: PdfNode[][] = rows.map(() => Array.from({ length: columnCount }, (): PdfNode => ({ text: '' })));
+    let breakAfter = false;
     for (const { cell, row, column, colspan, rowspan } of cells) {
       for (let r = row; r < row + rowspan; r++) {
         for (let c = column; c < column + colspan; c++) body[r]![c] = {};
@@ -1211,7 +1244,9 @@ class Converter {
           inTable: true,
         }),
       );
-      const pdf: PdfNode = { stack: join(content, 'box') };
+      const nested = takeBreaks(content);
+      breakAfter ||= nested.breakAfter;
+      const pdf: PdfNode = { stack: join(nested.blocks, 'box') };
       if (colspan > 1) pdf.colSpan = colspan;
       if (rowspan > 1) pdf.rowSpan = rowspan;
       if (header) pdf.fillColor = SURFACE_2;
@@ -1231,7 +1266,9 @@ class Converter {
 
     const table: PdfNode = { widths: inner, body };
     if (headerRows) table.headerRows = headerRows;
-    return [box({ table, layout: TABLE_LAYOUT }, 0.8 * BASE_SIZE)];
+    const block = box({ table, layout: TABLE_LAYOUT }, 0.8 * BASE_SIZE);
+    block.breakAfter = breakAfter;
+    return [block];
   }
 
   private tableOfContents(ctx: Ctx): Block[] {
@@ -1309,15 +1346,18 @@ class Converter {
       closePath: true,
       color: MUTED,
     };
+    const nested = takeBreaks(blocks);
     const cell = {
       columns: [
         { width: button, canvas: [triangle] },
-        { width: '*', stack: join(blocks, 'box') },
+        { width: '*', stack: join(nested.blocks, 'box') },
       ],
       columnGap: gap,
     };
     const layout = boxLayout({ border: LINE, color: BORDER, ...padding });
-    return box({ table: { widths: ['*'], body: [[cell]] }, layout }, 0.8 * BASE_SIZE);
+    const block = box({ table: { widths: ['*'], body: [[cell]] }, layout }, 0.8 * BASE_SIZE);
+    block.breakAfter = nested.breakAfter;
+    return block;
   }
 }
 

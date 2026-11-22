@@ -144,6 +144,47 @@ test('downloads a PDF with the formatting, links and bookmarks of the document',
   expect(errors).toEqual([]);
 });
 
+test('preserves page breaks inside block containers in the PDF', async ({ page }) => {
+  const file = await createFile(page, { type: 'doc', title: 'Nested page breaks' });
+  await page.goto(`/d/${file.id}`);
+  await waitForSync(page);
+  const editor = docEditor(page);
+  await editor.evaluate((element, html) => {
+    const clipboardData = new DataTransfer();
+    clipboardData.setData('text/html', html);
+    element.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }));
+  }, `<p>Before quote</p>
+    <blockquote><p>Quote before</p><div data-type="page-break"></div><p>Quote after</p></blockquote>
+    <p>After quote</p>
+    <table><tbody><tr><td><p>Cell before</p><div data-type="page-break"></div><p>Cell after</p></td></tr></tbody></table>
+    <p>After table</p>
+    <ul data-type="taskList"><li data-type="taskItem" data-checked="false"><div><p>Task before</p><div data-type="page-break"></div><p>Task after</p></div></li></ul>
+    <p>After task</p>
+    <details open><summary>Details</summary><div data-type="detailsContent"><p>Details before</p><div data-type="page-break"></div><p>Details after</p></div></details>
+    <p>After details</p>`);
+
+  const download = page.waitForEvent('download');
+  await pickMenu(page, ['File', 'Download', 'PDF document (.pdf)']);
+  const pdf = await download;
+  const content = await readPdf(await readFile(await pdf.path()));
+  const pageOf = (text: string) => content.pages.findIndex((lines) => lines.join(' ').includes(text));
+
+  expect(content.pages).toHaveLength(5);
+  for (const [before, after, following] of [
+    ['Quote before', 'Quote after', 'After quote'],
+    ['Cell before', 'Cell after', 'After table'],
+    ['Task before', 'Task after', 'After task'],
+    ['Details before', 'Details after', 'After details'],
+  ]) {
+    const beforePage = pageOf(before);
+    const afterPage = pageOf(after);
+    const followingPage = pageOf(following);
+    expect(beforePage).toBeGreaterThanOrEqual(0);
+    expect(afterPage).toBe(beforePage);
+    expect(followingPage).toBeGreaterThan(afterPage);
+  }
+});
+
 test('keeps pasted images at their mapped insertion point during upload', async ({ page }) => {
   const file = await createFile(page, { type: 'doc', title: 'Image anchor' });
   await page.goto(`/d/${file.id}`);
