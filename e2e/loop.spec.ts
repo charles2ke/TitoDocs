@@ -152,7 +152,10 @@ test('downloads a page as a PDF, with links to its components', async ({ page })
   const download = page.waitForEvent('download');
   await page.getByTestId('page-options').click();
   await page.getByRole('menu', { name: 'Page options' }).getByRole('menuitem', { name: 'Download' }).click();
-  await page.getByRole('menu', { name: 'Download' }).getByRole('menuitem', { name: 'PDF document (.pdf)' }).click();
+  const formats = page.getByRole('menu', { name: 'Download' });
+  await expect(formats.getByRole('menuitem')).toHaveText(['PDF document (.pdf)', 'Markdown (.md)', 'Web page (.html)', 'Plain text (.txt)']);
+  await snap(page, 'loop-download-menu');
+  await formats.getByRole('menuitem', { name: 'PDF document (.pdf)' }).click();
   const pdf = await download;
   expect(pdf.suggestedFilename()).toBe('Welcome.pdf');
   const bytes = await readFile(await pdf.path());

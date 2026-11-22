@@ -154,7 +154,7 @@ On every pull request, CI:
 - There's no automatic pagination: page breaks are manual.
 - Comment rules are enforced by the app, not the server. The app only lets you edit your own comments, and delete your own (or anyone's, if you moderate). Someone who may comment could still change other people's comments with a modified client.
 - The .docx export hasn't been tested in Microsoft Word, and the PDF download has only been checked with pdf.js.
-- The PDF download draws every font as Arimo, Tinos or Cousine (which have the widths of Arial, Times New Roman and Courier New), so other fonts look different. Images from other sites become links.
+- The PDF download draws every font as Arimo, Tinos or Cousine (which have the widths of Arial, Times New Roman and Courier New), so other fonts look different. Code blocks are light, as in the .docx download. Images from other sites become links.
 - The PDF download can't show characters that its fonts lack, such as Chinese, Japanese and Korean, and right-to-left text may come out in the wrong order. It warns about both and suggests printing to PDF instead.
 
 **Workspaces**

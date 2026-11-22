@@ -140,6 +140,7 @@ test('downloads a PDF with the formatting, links and bookmarks of the document',
   const warning = page.getByRole('status').filter({ hasText: 'can’t be shown in the PDF' });
   await expect(warning).toContainText('Some characters (東 京) can’t be shown in the PDF.');
   await expect(warning.getByRole('button', { name: 'Print' })).toBeVisible();
+  await snap(page, 'doc-pdf-warning');
   expect(errors).toEqual([]);
 });
 
