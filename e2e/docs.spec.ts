@@ -144,6 +144,37 @@ test('downloads a PDF with the formatting, links and bookmarks of the document',
   expect(errors).toEqual([]);
 });
 
+test('keeps a page-boundary heading with its paragraph and updates the table of contents', async ({ page }) => {
+  const file = await createFile(page, { type: 'doc', title: 'Heading relocation' });
+  await page.goto(`/d/${file.id}`);
+  await waitForSync(page);
+  const filler = Array.from({ length: 27 }, (_, index) => `<p>Filler paragraph ${index + 1}</p>`).join('');
+  const editor = docEditor(page);
+  await editor.evaluate((element, html) => {
+    const clipboardData = new DataTransfer();
+    clipboardData.setData('text/html', html);
+    element.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }));
+  }, `<div data-type="table-of-contents"></div>${filler}
+    <h2>Boundary heading</h2><p>Following paragraph stays with the heading.</p>
+    <h2>Later heading</h2><p>Later section content.</p>`);
+
+  const download = page.waitForEvent('download');
+  await pickMenu(page, ['File', 'Download', 'PDF document (.pdf)']);
+  const pdf = await download;
+  const content = await readPdf(await readFile(await pdf.path()));
+  const headingPage = content.pages.findIndex((lines) => lines.includes('Boundary heading'));
+  const laterHeadingPage = content.pages.findIndex((lines) => lines.includes('Later heading'));
+  const lastFillerPage = content.pages.findIndex((lines) => lines.includes('Filler paragraph 27'));
+  const tocEntries = content.pages.flat();
+
+  expect(content.pages.length).toBeGreaterThan(1);
+  expect(headingPage).toBeGreaterThan(0);
+  expect(lastFillerPage).toBe(headingPage - 1);
+  expect(content.pages[headingPage]).toContain('Following paragraph stays with the heading.');
+  expect(tocEntries).toContain(`Boundary heading ${headingPage + 1}`);
+  expect(tocEntries).toContain(`Later heading ${laterHeadingPage + 1}`);
+});
+
 test('preserves page breaks inside block containers in the PDF', async ({ page }) => {
   const file = await createFile(page, { type: 'doc', title: 'Nested page breaks' });
   await page.goto(`/d/${file.id}`);
