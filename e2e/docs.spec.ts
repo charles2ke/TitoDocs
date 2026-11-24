@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { createFile, docEditor, expect, pickMenu, snap, test, waitForSync } from './fixtures.ts';
+import { createFile, docEditor, expect, pickMenu, readPdf, showPdfPage, snap, test, waitForSync } from './fixtures.ts';
 
 test('writes and formats a new document that is still there after a reload', async ({ page }) => {
   await page.goto('/');
@@ -55,6 +55,165 @@ test('writes and formats a new document that is still there after a reload', asy
   expect(docx.suggestedFilename()).toBe('Quarterly report.docx');
   const bytes = await readFile(await docx.path());
   expect(bytes.subarray(0, 2).toString()).toBe('PK');
+});
+
+test('downloads a PDF with the formatting, links and bookmarks of the document', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text());
+  });
+  page.on('pageerror', (error) => errors.push(error.message));
+  const file = await createFile(page, { type: 'doc', title: 'Launch plan' });
+  await page.goto(`/d/${file.id}`);
+  await waitForSync(page);
+  const editor = docEditor(page);
+  await editor.click();
+  await editor.evaluate((element, html) => {
+    const clipboardData = new DataTransfer();
+    clipboardData.setData('text/html', html);
+    element.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }));
+  }, `<h1>Launch plan</h1>
+    <p>We ship on <strong>June 3</strong>. Read the <a href="https://example.com/brief">brief</a> first.</p>
+    <div data-type="table-of-contents"></div>
+    <h2>Timeline</h2>
+    <ol><li><p>Freeze features</p></li><li><p>Finish the beta ✓</p></li><li><p>Launch 🎉</p></li></ol>
+    <h2>Budget</h2>
+    <table><tbody>
+      <tr><th><p>Item</p></th><th><p>Cost</p></th></tr>
+      <tr><td><p>Ads</p></td><td><p>$4,000</p></td></tr>
+      <tr><td><p>Events</p></td><td><p>$2,500</p></td></tr>
+    </tbody></table>
+    <pre><code class="language-js">const launch = new Date('2025-06-03');</code></pre>`);
+  await expect(editor.locator('table')).toBeVisible();
+  await expect(editor.locator('h2')).toHaveText(['Timeline', 'Budget']);
+
+  const download = page.waitForEvent('download');
+  await pickMenu(page, ['File', 'Download', 'PDF document (.pdf)']);
+  const pdf = await download;
+  expect(pdf.suggestedFilename()).toBe('Launch plan.pdf');
+  const bytes = await readFile(await pdf.path());
+  expect(bytes.subarray(0, 5).toString()).toBe('%PDF-');
+  const content = await readPdf(bytes);
+  // A Letter page, the default page setup.
+  expect(content.size).toEqual([612, 792]);
+  expect(content.title).toBe('Launch plan');
+  expect(content.pages).toEqual([
+    [
+      'Launch plan',
+      'We ship on June 3. Read the brief first.',
+      'Table of contents',
+      'Launch plan 1',
+      'Timeline 1',
+      'Budget 1',
+      'Timeline',
+      '1. Freeze features',
+      '2. Finish the beta ✓',
+      '3. Launch 🎉',
+      'Budget',
+      'Item Cost',
+      'Ads $4,000',
+      'Events $2,500',
+      "const launch = new Date('2025-06-03');",
+    ],
+  ]);
+  expect(content.links).toEqual(['https://example.com/brief']);
+  expect(content.outline).toEqual([
+    {
+      title: 'Launch plan',
+      items: [
+        { title: 'Timeline', items: [] },
+        { title: 'Budget', items: [] },
+      ],
+    },
+  ]);
+  const viewer = await showPdfPage(page.context(), bytes);
+  await snap(viewer, 'doc-pdf');
+  await viewer.close();
+
+  // Characters that the PDF's fonts don't have can't be shown, so the download says so and suggests printing instead.
+  await editor.locator('p').first().click();
+  await page.keyboard.press('End');
+  await page.keyboard.type(' 東京');
+  const again = page.waitForEvent('download');
+  await pickMenu(page, ['File', 'Download', 'PDF document (.pdf)']);
+  await again;
+  const warning = page.getByRole('status').filter({ hasText: 'can’t be shown in the PDF' });
+  await expect(warning).toContainText('Some characters (東 京) can’t be shown in the PDF.');
+  await expect(warning.getByRole('button', { name: 'Print' })).toBeVisible();
+  await snap(page, 'doc-pdf-warning');
+  expect(errors).toEqual([]);
+});
+
+test('keeps a page-boundary heading with its paragraph and updates the table of contents', async ({ page }) => {
+  const file = await createFile(page, { type: 'doc', title: 'Heading relocation' });
+  await page.goto(`/d/${file.id}`);
+  await waitForSync(page);
+  const filler = Array.from({ length: 27 }, (_, index) => `<p>Filler paragraph ${index + 1}</p>`).join('');
+  const editor = docEditor(page);
+  await editor.evaluate((element, html) => {
+    const clipboardData = new DataTransfer();
+    clipboardData.setData('text/html', html);
+    element.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }));
+  }, `<div data-type="table-of-contents"></div>${filler}
+    <h2>Boundary heading</h2><p>Following paragraph stays with the heading.</p>
+    <h2>Later heading</h2><p>Later section content.</p>`);
+
+  const download = page.waitForEvent('download');
+  await pickMenu(page, ['File', 'Download', 'PDF document (.pdf)']);
+  const pdf = await download;
+  const content = await readPdf(await readFile(await pdf.path()));
+  const headingPage = content.pages.findIndex((lines) => lines.includes('Boundary heading'));
+  const laterHeadingPage = content.pages.findIndex((lines) => lines.includes('Later heading'));
+  const lastFillerPage = content.pages.findIndex((lines) => lines.includes('Filler paragraph 27'));
+  const tocEntries = content.pages.flat();
+
+  expect(content.pages.length).toBeGreaterThan(1);
+  expect(headingPage).toBeGreaterThan(0);
+  expect(lastFillerPage).toBe(headingPage - 1);
+  expect(content.pages[headingPage]).toContain('Following paragraph stays with the heading.');
+  expect(tocEntries).toContain(`Boundary heading ${headingPage + 1}`);
+  expect(tocEntries).toContain(`Later heading ${laterHeadingPage + 1}`);
+});
+
+test('preserves page breaks inside block containers in the PDF', async ({ page }) => {
+  const file = await createFile(page, { type: 'doc', title: 'Nested page breaks' });
+  await page.goto(`/d/${file.id}`);
+  await waitForSync(page);
+  const editor = docEditor(page);
+  await editor.evaluate((element, html) => {
+    const clipboardData = new DataTransfer();
+    clipboardData.setData('text/html', html);
+    element.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }));
+  }, `<p>Before quote</p>
+    <blockquote><p>Quote before</p><div data-type="page-break"></div><p>Quote after</p></blockquote>
+    <p>After quote</p>
+    <table><tbody><tr><td><p>Cell before</p><div data-type="page-break"></div><p>Cell after</p></td></tr></tbody></table>
+    <p>After table</p>
+    <ul data-type="taskList"><li data-type="taskItem" data-checked="false"><div><p>Task before</p><div data-type="page-break"></div><p>Task after</p></div></li></ul>
+    <p>After task</p>
+    <details open><summary>Details</summary><div data-type="detailsContent"><p>Details before</p><div data-type="page-break"></div><p>Details after</p></div></details>
+    <p>After details</p>`);
+
+  const download = page.waitForEvent('download');
+  await pickMenu(page, ['File', 'Download', 'PDF document (.pdf)']);
+  const pdf = await download;
+  const content = await readPdf(await readFile(await pdf.path()));
+  const pageOf = (text: string) => content.pages.findIndex((lines) => lines.join(' ').includes(text));
+
+  expect(content.pages).toHaveLength(5);
+  for (const [before, after, following] of [
+    ['Quote before', 'Quote after', 'After quote'],
+    ['Cell before', 'Cell after', 'After table'],
+    ['Task before', 'Task after', 'After task'],
+    ['Details before', 'Details after', 'After details'],
+  ]) {
+    const beforePage = pageOf(before);
+    const afterPage = pageOf(after);
+    const followingPage = pageOf(following);
+    expect(beforePage).toBeGreaterThanOrEqual(0);
+    expect(afterPage).toBe(beforePage);
+    expect(followingPage).toBeGreaterThan(afterPage);
+  }
 });
 
 test('keeps pasted images at their mapped insertion point during upload', async ({ page }) => {

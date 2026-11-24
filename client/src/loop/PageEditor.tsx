@@ -12,7 +12,7 @@ import {
 import { Link, useNavigate } from 'react-router';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { DragHandle } from '@tiptap/extension-drag-handle-react';
-import type { Editor } from '@tiptap/core';
+import type { Editor, JSONContent } from '@tiptap/core';
 import { NodeSelection, type EditorState } from '@tiptap/pm/state';
 import { absolutePositionToRelativePosition, relativePositionToAbsolutePosition, ySyncPluginKey } from '@tiptap/y-tiptap';
 import type * as Y from 'yjs';
@@ -60,7 +60,7 @@ import { TrashedBanner } from '../pages/FileGate';
 import { COMPONENT_ORDER, COMPONENT_TYPES } from './componentTypes';
 import { clearFresh, isFresh, LoopContext, markFresh, type LoopEnv } from './context';
 import { EmojiPicker } from './EmojiPicker';
-import { LoopComponent } from './LoopComponentNode';
+import { componentLink, LoopComponent } from './LoopComponentNode';
 import { ancestors } from './tree';
 
 const DEFAULT_TITLE = 'Untitled page';
@@ -175,7 +175,20 @@ function loopSlashItems({ insertComponent, startSubpage }: LoopActions): SlashIt
 // ------------------------------------------------------------------ page editor
 
 type PageDialog = 'link' | 'shortcuts' | 'versions' | 'subpage';
-type DownloadFormat = 'md' | 'html' | 'txt';
+type DownloadFormat = 'md' | 'html' | 'txt' | 'pdf';
+
+/** A page for the PDF download: its title, then its content with links in place of Loop components. */
+function pdfContent(title: string, doc: JSONContent): JSONContent {
+  const replace = (node: JSONContent): JSONContent => {
+    if (node.type === 'loopComponent') {
+      const { href, label } = componentLink(node.attrs);
+      return { type: 'paragraph', content: [{ type: 'text', text: label, marks: [{ type: 'link', attrs: { href } }] }] };
+    }
+    return node.content ? { ...node, content: node.content.map(replace) } : node;
+  };
+  const heading: JSONContent[] = title ? [{ type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: title }] }] : [];
+  return { ...doc, content: [...heading, ...(doc.content ?? []).map(replace)] };
+}
 
 export interface PageEditorProps {
   state: FileState;
@@ -353,6 +366,13 @@ export function PageEditor({ state, file, workspace, pages, room, commentsRoom, 
 
   const download = async (format: DownloadFormat) => {
     try {
+      if (format === 'pdf') {
+        const { exportPdf } = await import('../docs/pdf');
+        const { blob, warning } = await exportPdf(pdfContent(file.title, editor.getJSON()), file.title, DEFAULT_PAGE_SETUP);
+        downloadBlob(blob, `${safeFileName(file.title)}.pdf`);
+        if (warning) toast.show(warning, { action: { label: 'Print', onClick: print } });
+        return;
+      }
       const exporters = await import('../docs/exporters');
       const html = `<h1>${escapeHtml(file.title)}</h1>${editor.getHTML()}`;
       let blob: Blob;
@@ -464,6 +484,7 @@ export function PageEditor({ state, file, workspace, pages, room, commentsRoom, 
         label: 'Download',
         icon: <Download size={16} />,
         submenu: [
+          { label: 'PDF document (.pdf)', onSelect: () => void download('pdf') },
           { label: 'Markdown (.md)', onSelect: () => void download('md') },
           { label: 'Web page (.html)', onSelect: () => void download('html') },
           { label: 'Plain text (.txt)', onSelect: () => void download('txt') },

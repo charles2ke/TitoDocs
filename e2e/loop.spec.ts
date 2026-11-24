@@ -1,5 +1,6 @@
+import { readFile } from 'node:fs/promises';
 import type { Locator, Page } from '@playwright/test';
-import { expect, snap, test, USERS } from './fixtures.ts';
+import { expect, readPdf, showPdfPage, snap, test, USERS } from './fixtures.ts';
 
 /** Starts a workspace from its template on the home page, which opens the workspace's Welcome page. */
 async function newWorkspace(page: Page): Promise<void> {
@@ -137,6 +138,38 @@ test('adds, trashes and restores pages', async ({ page }) => {
   await expect(title).toHaveValue('Agenda');
   await page.reload();
   await expect(editor).toHaveText('Welcome and introductions');
+});
+
+test('downloads a page as a PDF, with links to its components', async ({ page }) => {
+  await newWorkspace(page);
+  await newLineAtEnd(page);
+  await page.getByTestId('insert-menu').click();
+  await page.getByTestId('insert-tasks').click();
+  const card = componentCard(page, 'tasks');
+  await expect(card.getByRole('textbox', { name: 'Task' })).toBeFocused();
+  const href = await card.getByRole('link', { name: 'Open in full view' }).getAttribute('href');
+
+  const download = page.waitForEvent('download');
+  await page.getByTestId('page-options').click();
+  await page.getByRole('menu', { name: 'Page options' }).getByRole('menuitem', { name: 'Download' }).click();
+  const formats = page.getByRole('menu', { name: 'Download' });
+  await expect(formats.getByRole('menuitem')).toHaveText(['PDF document (.pdf)', 'Markdown (.md)', 'Web page (.html)', 'Plain text (.txt)']);
+  await snap(page, 'loop-download-menu');
+  await formats.getByRole('menuitem', { name: 'PDF document (.pdf)' }).click();
+  const pdf = await download;
+  expect(pdf.suggestedFilename()).toBe('Welcome.pdf');
+  const bytes = await readFile(await pdf.path());
+  const content = await readPdf(bytes);
+  expect(content.title).toBe('Welcome');
+  expect(content.pages).toHaveLength(1);
+  // The page's title comes first, and components (whose content lives elsewhere) are links.
+  expect(content.pages[0]![0]).toBe('Welcome');
+  expect(content.pages[0]).toContain('Get started');
+  expect(content.pages[0]![content.pages[0]!.length - 1]).toBe('Task list (Loop component)');
+  expect(content.links).toEqual([new URL(href!, page.url()).href]);
+  const viewer = await showPdfPage(page.context(), bytes);
+  await snap(viewer, 'loop-pdf');
+  await viewer.close();
 });
 
 test('fits a phone screen, with the pages in a drawer', async ({ page }) => {
