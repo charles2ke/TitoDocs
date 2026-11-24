@@ -30,23 +30,12 @@ import {
   type ParagraphChild,
 } from 'docx';
 import { INDENT_STEP_IN } from '../editor/paragraph-format';
-import { fetchSameOrigin } from '../lib/util';
+import { collectHeadings, hexColor, loadImages, plainText, safeLink, type Headings, type LoadedImage } from './exportShared';
 import { PAGE_SIZES, paperSize, type PageSetup } from './pageSetup';
 
 type Block = Paragraph | Table;
 type Writable<T> = { -readonly [K in keyof T]: T[K] };
-
-interface LoadedImage {
-  data: Uint8Array;
-  type: 'png' | 'jpg' | 'gif' | 'bmp';
-  width: number;
-  height: number;
-}
-
-interface Headings {
-  list: { level: number; text: string }[];
-  index: Map<JSONContent, number>;
-}
+type DocxImage = LoadedImage<'png' | 'jpg' | 'gif' | 'bmp'>;
 
 interface Context {
   /** Left indent in twips, for quotes and content nested in lists or collapsible sections. */
@@ -85,7 +74,7 @@ const NUMBER_FORMATS = [LevelFormat.DECIMAL, LevelFormat.LOWER_LETTER, LevelForm
 const BULLETS = ['●', '○', '■'];
 const QUOTE_BORDER = { left: { style: BorderStyle.SINGLE, size: 18, color: 'DADCE0', space: 10 } };
 const CODE_SIDE = { style: BorderStyle.SINGLE, size: 4, color: 'E1E4E8', space: 4 };
-const DOCX_IMAGE_TYPES: Record<string, LoadedImage['type']> = {
+const DOCX_IMAGE_TYPES: Record<string, DocxImage['type']> = {
   'image/png': 'png',
   'image/jpeg': 'jpg',
   'image/gif': 'gif',
@@ -95,41 +84,12 @@ const DOCX_IMAGE_TYPES: Record<string, LoadedImage['type']> = {
 const shading = (fill: string) => ({ type: ShadingType.CLEAR, color: 'auto', fill });
 const bookmarkName = (index: number) => `heading_${index + 1}`;
 
-const plainText = (node: JSONContent): string =>
-  node.type === 'text'
-    ? (node.text ?? '')
-    : node.type === 'mention'
-      ? `@${node.attrs?.label ?? node.attrs?.id ?? ''}`
-      : (node.content ?? []).map(plainText).join('');
-
 /** Splits text on tabs, which Word needs as separate tab elements. */
 const textChildren = (text: string): (string | Tab)[] =>
   text
     .split('\t')
     .flatMap((part, index) => (index ? [new Tab(), part] : [part]))
     .filter((child) => child !== '');
-
-let colorContext: CanvasRenderingContext2D | null | undefined;
-
-/** Converts a CSS colour to Word's hex form; undefined for invalid or transparent colours. */
-function hexColor(value: unknown): string | undefined {
-  if (typeof value !== 'string' || !value.trim()) return undefined;
-  colorContext ??= document.createElement('canvas').getContext('2d');
-  if (!colorContext) return undefined;
-  const sentinel = '#010203';
-  colorContext.fillStyle = sentinel;
-  colorContext.fillStyle = value;
-  const normalized = String(colorContext.fillStyle);
-  if (normalized === sentinel && value.trim().toLowerCase() !== sentinel) return undefined;
-  if (normalized.startsWith('#')) return normalized.slice(1).toUpperCase();
-  const match = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/.exec(normalized);
-  if (!match || Number(match[4] ?? 1) === 0) return undefined;
-  return match
-    .slice(1, 4)
-    .map((channel) => Number(channel).toString(16).padStart(2, '0'))
-    .join('')
-    .toUpperCase();
-}
 
 /** CSS font size to Word's half-points. */
 function halfPoints(value: unknown): number | undefined {
@@ -159,17 +119,6 @@ function lineSpacing(value: unknown): IParagraphOptions['spacing'] {
 
 const fontName = (value: unknown): string | undefined =>
   typeof value === 'string' ? value.split(',')[0]!.trim().replace(/^["']|["']$/g, '') || undefined : undefined;
-
-/** Absolute http(s)/mailto/tel URLs; anything else can't be a link in Word. */
-function safeLink(href: unknown): string | null {
-  if (typeof href !== 'string' || !href || href.startsWith('#')) return null;
-  try {
-    const url = new URL(href, window.location.href);
-    return /^(https?|mailto|tel):$/.test(url.protocol) ? url.toString() : null;
-  } catch {
-    return null;
-  }
-}
 
 function markOptions(marks: JSONContent['marks'] = []): Writable<IRunOptions> {
   const options: Writable<IRunOptions> = {};
@@ -254,75 +203,12 @@ function runs(content: JSONContent[] | undefined, base: IRunOptions = {}): Parag
   return children;
 }
 
-function collectHeadings(doc: JSONContent): Headings {
-  const headings: Headings = { list: [], index: new Map() };
-  const visit = (node: JSONContent) => {
-    if (node.type === 'heading') {
-      const text = plainText(node).trim();
-      if (text) {
-        headings.index.set(node, headings.list.length);
-        headings.list.push({ level: Number(node.attrs?.level) || 1, text });
-      }
-      return;
-    }
-    node.content?.forEach(visit);
-  };
-  visit(doc);
-  return headings;
-}
-
-async function loadImage(src: string): Promise<LoadedImage | null> {
-  const blob = await fetchSameOrigin(src);
-  if (!blob) return null;
-  const url = URL.createObjectURL(blob);
-  try {
-    const element = new Image();
-    element.src = url;
-    await element.decode();
-    const width = element.naturalWidth || 300;
-    const height = element.naturalHeight || 150;
-    let type = DOCX_IMAGE_TYPES[blob.type];
-    let data: Blob | null = blob;
-    if (!type) {
-      // Word can't show WebP, AVIF or SVG images, so they are converted to PNG.
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      canvas.getContext('2d')?.drawImage(element, 0, 0, width, height);
-      data = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
-      type = 'png';
-    }
-    return data ? { data: new Uint8Array(await data.arrayBuffer()), type, width, height } : null;
-  } catch {
-    return null;
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
-async function loadImages(doc: JSONContent): Promise<Map<string, LoadedImage>> {
-  const sources = new Set<string>();
-  const visit = (node: JSONContent) => {
-    if (node.type === 'image' && typeof node.attrs?.src === 'string') sources.add(node.attrs.src);
-    node.content?.forEach(visit);
-  };
-  visit(doc);
-  const images = new Map<string, LoadedImage>();
-  await Promise.all(
-    [...sources].map(async (src) => {
-      const image = await loadImage(src);
-      if (image) images.set(src, image);
-    }),
-  );
-  return images;
-}
-
 class Converter {
   private instances = 0;
   private readonly numberingStarts = new Set([1]);
 
   constructor(
-    private readonly images: Map<string, LoadedImage>,
+    private readonly images: Map<string, DocxImage>,
     private readonly headings: Headings,
   ) {}
 
@@ -645,7 +531,7 @@ const headingStyle = (level: number) => ({
 /** A Word document with the document's formatting, page setup and (same-site) images. */
 export async function exportDocx(json: JSONContent, title: string, setup: PageSetup): Promise<Blob> {
   const contentWidth = convertInchesToTwip(paperSize(setup).width - setup.margins.left - setup.margins.right);
-  const converter = new Converter(await loadImages(json), collectHeadings(json));
+  const converter = new Converter(await loadImages(json, DOCX_IMAGE_TYPES), collectHeadings(json));
   const children = converter.blocks(json.content, { indent: 0, listLevel: 0, quote: false, width: contentWidth });
   if (!(children[children.length - 1] instanceof Paragraph)) children.push(new Paragraph({}));
   const size = PAGE_SIZES[setup.size];

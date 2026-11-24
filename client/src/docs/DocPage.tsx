@@ -304,14 +304,14 @@ function DocEditor({ state, file, room, commentsRoom }: DocEditorProps) {
   const print = () => window.print();
 
   const download = async (format: DownloadFormat) => {
-    if (format === 'pdf') {
-      toast.show('In the print dialog, choose “Save as PDF” as the destination.');
-      setTimeout(print, 300);
-      return;
-    }
     try {
       let blob: Blob;
-      if (format === 'docx') {
+      if (format === 'pdf') {
+        const { exportPdf } = await import('./pdf');
+        const result = await exportPdf(editor.getJSON(), file.title, setup);
+        blob = result.blob;
+        if (result.warning) toast.show(result.warning, { action: { label: 'Print', onClick: print } });
+      } else if (format === 'docx') {
         const { exportDocx } = await import('./docx');
         blob = await exportDocx(editor.getJSON(), file.title, setup);
       } else {
