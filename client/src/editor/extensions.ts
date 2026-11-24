@@ -82,7 +82,7 @@ export interface EditorSetup {
 /** Whether keyboard focus is in a text field outside the editor, such as the file name or a comment box. */
 function typingElsewhere(editor: Editor): boolean {
   const active = document.activeElement;
-  if (!(active instanceof HTMLElement) || editor.view.dom.contains(active)) return false;
+  if (!(active instanceof HTMLElement) || active === editor.view.dom) return false;
   return active.isContentEditable || active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement;
 }
 
