@@ -331,6 +331,43 @@ test('inserts several pasted images in order and keeps writing after them', asyn
   await snap(page, 'doc-images-in-order');
 });
 
+test('keeps a text cursor after images when a list follows', async ({ page }) => {
+  const file = await createFile(page, { type: 'doc', title: 'Image before list' });
+  await page.goto(`/d/${file.id}`);
+  await waitForSync(page);
+  const editor = docEditor(page);
+  await editor.click();
+  await page.keyboard.type('before');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('ControlOrMeta+Shift+8');
+  await page.keyboard.type('following list');
+
+  await editor.locator('p').first().click();
+  await page.keyboard.press('End');
+  await pasteImages(editor, ['first', 'second']);
+  await expect(editor.locator('img')).toHaveCount(2);
+  await page.keyboard.type('between');
+
+  expect(await blocksWithImages(editor)).toEqual(['before', 'image first', 'image second', 'between', 'following list', '']);
+});
+
+test('adds a paragraph after images at the end of a list item', async ({ page }) => {
+  const file = await createFile(page, { type: 'doc', title: 'Images in a list' });
+  await page.goto(`/d/${file.id}`);
+  await waitForSync(page);
+  const editor = docEditor(page);
+  await editor.click();
+  await page.keyboard.press('ControlOrMeta+Shift+8');
+  await page.keyboard.type('list item');
+  await pasteImages(editor, ['first', 'second']);
+  await expect(editor.locator('img')).toHaveCount(2);
+  await page.keyboard.type('after');
+
+  const item = editor.locator('li').first();
+  await expect(item.locator(':scope > p').last()).toHaveText('after');
+  expect(await item.evaluate((element) => Array.from(element.children, (child) => child.tagName))).toEqual(['P', 'DIV', 'DIV', 'P']);
+});
+
 test('leaves the cursor alone when someone writes elsewhere while images upload', async ({ page }) => {
   const file = await createFile(page, { type: 'doc', title: 'Image cursor' });
   await page.goto(`/d/${file.id}`);

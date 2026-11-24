@@ -103,8 +103,14 @@ function placeImages(editor: Editor, images: JSONContent[], { at, cursor }: Imag
   if (!follow) return;
   const after = editor.state.selection;
   // Leave a text cursor after the images rather than a selected image that typing would replace.
-  if (after instanceof NodeSelection && after.node.type === schema.nodes.image && editor.state.doc.resolve(after.to).nodeAfter?.isTextblock) {
-    editor.commands.setTextSelection(after.to + 1);
+  if (after instanceof NodeSelection && after.node.type === schema.nodes.image) {
+    const $after = editor.state.doc.resolve(after.to);
+    if ($after.nodeAfter?.isTextblock) {
+      editor.commands.setTextSelection(after.to + 1);
+    } else if ($after.parent.canReplaceWith($after.index(), $after.index(), schema.nodes.paragraph)) {
+      editor.commands.insertContentAt(after.to, { type: 'paragraph' }, { updateSelection: false });
+      editor.commands.setTextSelection(after.to + 1);
+    }
   }
   editor.view.focus();
 }
