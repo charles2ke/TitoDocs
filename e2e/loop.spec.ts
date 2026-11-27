@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import type { Locator, Page } from '@playwright/test';
+import type { Locator, Page, Route } from '@playwright/test';
 import { expect, readPdf, showPdfPage, snap, test, USERS } from './fixtures.ts';
 
 /** Starts a workspace from its template on the home page, which opens the workspace's Welcome page. */
@@ -18,6 +18,44 @@ async function newLineAtEnd(page: Page): Promise<void> {
 
 const componentCard = (page: Page, type: string): Locator =>
   page.getByTestId('page-paper').locator(`[data-testid="loop-card"][data-component-type="${type}"]`);
+
+async function holdUploads(page: Page): Promise<{ started: Promise<void>; release: () => Promise<void> }> {
+  let notifyStarted!: () => void;
+  let releaseHeld!: () => void;
+  const started = new Promise<void>((resolve) => (notifyStarted = resolve));
+  const held = new Promise<void>((resolve) => (releaseHeld = resolve));
+  const handling: Promise<void>[] = [];
+  const handler = (route: Route) => {
+    const handled = (async () => {
+      notifyStarted();
+      await held;
+      await route.continue();
+    })();
+    handling.push(handled);
+    return handled;
+  };
+  await page.route('**/api/uploads', handler);
+  return {
+    started,
+    release: async () => {
+      releaseHeld();
+      await Promise.all(handling);
+      await page.unroute('**/api/uploads', handler);
+    },
+  };
+}
+
+async function pasteImage(editor: Locator): Promise<void> {
+  await editor.evaluate(async (element) => {
+    const clipboardData = new DataTransfer();
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    const png = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+    clipboardData.items.add(new File([png!], 'nested-focus.png', { type: 'image/png' }));
+    element.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }));
+  });
+}
 
 test('starts a workspace and shares a live task list', async ({ page, openAs }) => {
   await newWorkspace(page);
@@ -61,6 +99,27 @@ test('starts a workspace and shares a live task list', async ({ page, openAs }) 
   await victor.getByRole('checkbox', { name: 'Done' }).nth(1).check();
   await expect(card).toContainText('2 of 2 done');
   await snap(victor, 'loop-component-full-view');
+});
+
+test('does not refocus the page editor when typing in a nested loop input during upload', async ({ page }) => {
+  await newWorkspace(page);
+  await newLineAtEnd(page);
+  await page.getByTestId('insert-menu').click();
+  await page.getByTestId('insert-tasks').click();
+  const task = componentCard(page, 'tasks').getByRole('textbox', { name: 'Task' });
+  await expect(task).toBeFocused();
+
+  await newLineAtEnd(page);
+  const editor = page.getByTestId('page-paper').locator('.tiptap');
+  const upload = await holdUploads(page);
+  await pasteImage(editor);
+  await upload.started;
+  await task.fill('Keep focus here');
+  await upload.release();
+
+  await expect(editor.locator('img')).toHaveCount(1);
+  await expect(task).toBeFocused();
+  await expect(task).toHaveValue('Keep focus here');
 });
 
 test('votes in a voting table that others open from its link', async ({ page, openAs }) => {
